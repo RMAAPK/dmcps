@@ -1,0 +1,32 @@
+{
+  "name": "secure-mcp-sandbox",
+  "version": "1.0.0",
+  "description": "Secure, non-root MCP sandbox for AI agents with a security dashboard",
+  "author": "Raja Muhammad Ali Asghar (@thealidev)",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/dashboard.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/dashboard.js",
+    "stdio": "node dist/stdio.js",
+    "dev": "ts-node-esm src/dashboard.ts",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.1",
+    "@ngrok/ngrok": "^1.7.0",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.0.0",
+    "jest": "^30.5.2",
+    "ts-jest": "^29.4.14",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  }
+}

@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build: .
+    container_name: secure-mcp-sandbox
+    ports:
+      - "3000:3000"
+    # Keep stdin open for MCP JSON-RPC over stdio if needed
+    stdin_open: true
+    tty: false
+    volumes:
+      # Mount the configuration folder where allowed directories list is stored
+      - ./config:/app/config
+      # Mount the main host directory into the container (e.g. /projects).
+      # The AI is blocked from accessing subdirectories until whitelisted via the dashboard.
+      - ./projects:/projects
+    # Read environment variables from the .env file
+    env_file:
+      - .env
+    environment:
+      # These serve as fallbacks if not defined in .env
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-supersecret}
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
+    
+    # ------------------ SECURITY CONSTRAINTS ------------------ #
+    # Drop all kernel capabilities for maximum security
+    cap_drop:
+      - ALL
+    # Prevent privilege escalation
+    security_opt:
+      - no-new-privileges:true
+    # Make the root filesystem read-only to prevent tampering
+    read_only: true
+    # Provide temporary writable filesystems for Node.js if needed
+    tmpfs:
+      - /tmp

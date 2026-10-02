@@ -1,0 +1,42 @@
+import * as fs from "fs/promises";
+import * as path from "path";
+
+// Vercel serverless functions have a read-only filesystem except for /tmp
+const defaultPath = process.env.VERCEL ? "/tmp/allowed_dirs.json" : "/app/config/allowed_dirs.json";
+const CONFIG_PATH = process.env.CONFIG_PATH || defaultPath;
+
+export interface Config {
+    allowedDirectories: string[];
+}
+
+export async function loadConfig(): Promise<Config> {
+    try {
+        const data = await fs.readFile(CONFIG_PATH, 'utf-8');
+        return JSON.parse(data);
+    } catch {
+        // Default safe config
+        return { allowedDirectories: [] };
+    }
+}
+
+export async function saveConfig(config: Config): Promise<void> {
+    await fs.mkdir(path.dirname(CONFIG_PATH), { recursive: true });
+    await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+}
+
+/**
+ * Validates if the target path is strictly within any of the configured allowed directories.
+ */
+export async function isPathAllowed(targetPath: string): Promise<boolean> {
+    const config = await loadConfig();
+    const resolved = path.resolve(targetPath);
+    
+    for (const dir of config.allowedDirectories) {
+        const allowedDir = path.resolve(dir);
+        // Ensure the path is exactly the allowed dir or a child of it
+        if (resolved === allowedDir || resolved.startsWith(allowedDir + path.sep)) {
+            return true;
+        }
+    }
+    return false;
+}
