@@ -1,7 +1,7 @@
 {
-  "name": "secure-mcp-sandbox",
+  "name": "dmcps",
   "version": "1.0.0",
-  "description": "Secure, non-root MCP sandbox for AI agents with a security dashboard",
+  "description": "DMCPS (Docker Model Context Protocol Secured) - A highly secure MCP sandbox for AI agents",
   "author": "Raja Muhammad Ali Asghar (@thealidev)",
   "license": "MIT",
   "type": "module",

@@ -1,4 +1,21 @@
-# Secure Docker SSH MCP Sandbox
+# 🛡️ DMCPS (Docker Model Context Protocol Secured)
+
+[![CI Tests](https://github.com/RMAAPK/dmcps/actions/workflows/test.yml/badge.svg)](https://github.com/RMAAPK/dmcps/actions/workflows/test.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+
+<p align="center">
+  <a href="https://render.com/deploy?repo=https://github.com/RMAAPK/dmcps">
+    <img src="https://render.com/images/deploy-to-render-button.svg" alt="Deploy to Render">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://railway.app/template?gh_repo=RMAAPK/dmcps">
+    <img src="https://railway.app/button.svg" alt="Deploy on Railway">
+  </a>
+  &nbsp;&nbsp;
+  <a href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FRMAAPK%2Fdmcps">
+    <img src="https://vercel.com/button" alt="Deploy with Vercel">
+  </a>
+</p>
 
 A highly secure, isolated Model Context Protocol (MCP) server environment designed to give AI agents access to a sandboxed filesystem and shell execution, without compromising the host machine. 
 
