@@ -17,6 +17,10 @@
   </a>
 </p>
 
+<p align="center">
+  <a href="https://www.producthunt.com/products/dmcps/reviews/new?utm_source=badge-product_review&utm_medium=badge&utm_source=badge-dmcps" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/product_review.svg?product_id=1333432&theme=neutral" alt="DMCPS - Secure&#0032;Docker&#0032;sandbox&#0032;for&#0032;AI&#0032;agent&#0032;filesystem&#0032;&#0038;&#0032;shell&#0032;access | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
+</p>
+
 A highly secure, isolated Model Context Protocol (MCP) server environment designed to give AI agents access to a sandboxed filesystem and shell execution, without compromising the host machine. 
 
 This is built as a robust **Node.js/Express backend daemon**, featuring a "military-grade" secured dashboard to strictly manage which directories the AI is allowed to touch.
