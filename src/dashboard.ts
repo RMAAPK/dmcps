@@ -1,7 +1,6 @@
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import basicAuth from 'express-basic-auth';
 import * as fs from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -41,11 +40,16 @@ app.use((req, res, next) => {
 
 // Basic Authentication Middleware for Dashboard ONLY
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
-const authMiddleware = basicAuth({
-    users: { 'admin': ADMIN_PASSWORD },
-    challenge: true,
-    realm: 'Sandbox Dashboard'
-});
+const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
+    const [user, password] = Buffer.from(b64auth, 'base64').toString().split(':');
+    
+    if (user === 'admin' && password === ADMIN_PASSWORD) {
+        return next();
+    }
+    res.set('WWW-Authenticate', 'Basic realm="Sandbox Dashboard"');
+    res.status(401).send('Authentication required.');
+};
 
 // ---------------- DASHBOARD UI ----------------
 const activeConnections = new Set<string>();
