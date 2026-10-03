@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.producthunt.com/products/dmcps/reviews/new?utm_source=badge-product_review&utm_medium=badge&utm_source=badge-dmcps" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/product_review.svg?product_id=1333432&theme=neutral" alt="DMCPS - Secure&#0032;Docker&#0032;sandbox&#0032;for&#0032;AI&#0032;agent&#0032;filesystem&#0032;&#0038;&#0032;shell&#0032;access | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
+  <a href="https://www.producthunt.com/products/dmcps/reviews/new?utm_source=badge-product_review&utm_medium=badge&utm_source=badge-dmcps" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/product_review.svg?product_id=1333432&theme=neutral" alt="DMCPS - Secure Docker sandbox for AI agent filesystem & shell access | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 </p>
 
 A highly secure, isolated Model Context Protocol (MCP) server environment designed to give AI agents access to a sandboxed filesystem and shell execution, without compromising the host machine. 
@@ -32,6 +32,7 @@ This is built as a robust **Node.js/Express backend daemon**, featuring a "milit
   - Protected by a single environment password (`ADMIN_PASSWORD`).
   - Implements **Rate Limiting** to prevent brute-force login attacks.
   - Hardened with **Helmet** (CSP, HSTS, XSS protection, anti-sniffing).
+- **Auto-Generated API Keys**: Connect to your MCP server using a dynamically generated Bearer token to ensure only authorized agents can execute tools on your server.
 - **Docker Lockdown**: 
   - Drops all Linux kernel capabilities (`cap_drop: ALL`).
   - Prevents privilege escalation (`security_opt: no-new-privileges:true`).
@@ -53,14 +54,28 @@ docker-compose up -d --build
 ```
 This will mount your local `./projects` folder into the sandbox, but the AI won't be able to touch it until you approve the path in the dashboard.
 
-### 3. Configure the Sandbox
+### 3. Configure the Sandbox & Get Your API Key
 Navigate to the mobile-friendly dashboard:
 👉 **http://localhost:3000/** 
-Log in with username `admin` and your `ADMIN_PASSWORD`. Use the dashboard to whitelist a specific directory (e.g., `/projects/my-app`).
+Log in with username `admin` and your `ADMIN_PASSWORD`. 
+
+From the dashboard, you can:
+1. **Whitelist directories** (e.g., `/projects/my-app`) that the AI can interact with.
+2. **Copy your API Key** needed for the AI agent to securely connect.
+3. **Monitor Active Connections** in real-time.
+4. **Copy the exact JSON Config** for Cursor or Claude Desktop.
 
 ### 4. Connect your AI Agent
-Point your MCP-compatible AI agent (like Cursor, Claude Desktop, or custom tools) to the Server-Sent Events (SSE) endpoint:
-👉 **http://localhost:3000/sse**
+Point your MCP-compatible AI agent (like Cursor, Claude Desktop, Gemini, Spark, or custom tools) to the Server-Sent Events (SSE) endpoint securely. 
+
+Raw agents and clients can connect to standard endpoints:
+👉 **http://localhost:3000/sse** OR **http://localhost:3000/mcp**
+
+You must pass the auto-generated API Key (found in your dashboard) in the request headers:
+```
+Authorization: Bearer mcp_your_random_key_here
+```
+*(You can also pass it in the URL for raw browser connections: `/mcp?key=mcp_your_random_key_here`)*
 
 ---
 
@@ -74,7 +89,7 @@ Clicking deploy or pushing to Render will automatically read `render.yaml`. It s
 Push to Railway and it will automatically detect the `railway.toml` config, building the backend via Nixpacks and keeping the daemon alive automatically.
 
 ### Vercel (Testing Only)
-Vercel is supported via `vercel.json` for UI testing. *Note: Because Vercel is a stateless serverless platform, whitelist configurations will be saved to `/tmp` and will reset when the function goes to sleep. For production, use Render, Railway, or Docker.*
+Vercel is supported via `vercel.json` for UI testing. *Note: Because Vercel is a stateless serverless platform, whitelist configurations and API keys will be saved to `/tmp` and will reset when the function goes to sleep. For production, use Render, Railway, or Docker.*
 
 ---
 
