@@ -43,8 +43,9 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Parse URL-encoded bodies for form submissions
+// Parse URL-encoded bodies for form submissions and JSON for MCP requests
 app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
 
 
 // Basic Authentication Middleware for Dashboard ONLY
