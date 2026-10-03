@@ -1,51 +1,35 @@
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import basicAuth from 'express-basic-auth';
+import * as fs from 'fs/promises';
+import { exec } from 'child_process';
+import { promisify } from 'util';
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import { exec } from "child_process";
-import { promisify } from "util";
-import * as fs from "fs/promises";
-import { loadConfig, saveConfig, isPathAllowed } from "./config.js";
+import { loadConfig, saveConfig, isPathAllowed } from './config.js';
+import ngrok from '@ngrok/ngrok';
 
 const execAsync = promisify(exec);
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
-if (!ADMIN_PASSWORD) {
-    console.error("CRITICAL: ADMIN_PASSWORD environment variable is required.");
-    process.exit(1);
-}
+// ---------------- MIDDLEWARE & SECURITY ----------------
+app.use(helmet());
 
-// ---------------- MILITARY GRADE SECURITY ----------------
-
-// 1. Helmet sets 14 different HTTP security headers (CSP, HSTS, XSS protection, etc.)
-app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-        }
-    }
-}));
-
-// 2. Strict Rate Limiting (Prevents Brute-Force Password Attacks)
-// Max 10 failed login attempts or requests per 15 minutes per IP
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 50, // Limit each IP to 50 requests per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: 100,
     message: 'Too many requests from this IP, please try again later.',
     standardHeaders: true, 
     legacyHeaders: false, 
 });
 app.use(limiter);
 
-// We MUST NOT use global body parsers for /message, because the MCP SDK needs to read the raw request stream!
+// We MUST NOT use global body parsers for /message or /mcp/message, because the MCP SDK needs to read the raw request stream!
 app.use((req, res, next) => {
-    if (req.path === '/message' || req.path === '/sse') {
+    if (req.path === '/message' || req.path === '/sse' || req.path.startsWith('/mcp')) {
         return next();
     }
     // Only apply body parsing to the dashboard
@@ -55,56 +39,43 @@ app.use((req, res, next) => {
     });
 });
 
-
 // Basic Authentication Middleware for Dashboard ONLY
-app.use((req, res, next) => {
-    // SSE endpoint and messages do not require the dashboard password
-    // (Agents connect to /sse directly. You can add a token check here later if needed for AI auth)
-    if (req.path === '/sse' || req.path === '/message') {
-        return next();
-    }
-    
-    const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
-    const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
-
-    // Simple auth checking just the password against admin
-    if (login === 'admin' && password === ADMIN_PASSWORD) {
-        return next();
-    }
-
-    res.set('WWW-Authenticate', 'Basic realm="Sandbox Dashboard"');
-    res.status(401).send('Authentication required.');
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
+const authMiddleware = basicAuth({
+    users: { 'admin': ADMIN_PASSWORD },
+    challenge: true,
+    realm: 'Sandbox Dashboard'
 });
 
-// ---------------- DASHBOARD ROUTES ----------------
+// ---------------- DASHBOARD UI ----------------
+const activeConnections = new Set<string>();
 
-app.get('/', async (req, res) => {
+app.get('/', authMiddleware, async (req, res) => {
     const config = await loadConfig();
     const html = `
         <!DOCTYPE html>
         <html>
         <head>
-            <title>MCP Sandbox Dashboard</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>DMCPS Dashboard</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
-                body { font-family: system-ui, sans-serif; max-width: 800px; margin: 0 auto; padding: 15px; background: #f9f9f9; }
-                .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-                h1 { color: #333; margin-top: 0; font-size: 1.5rem; }
-                ul { list-style-type: none; padding: 0; }
-                li { background: #f0f0f0; margin-bottom: 10px; padding: 10px; border-radius: 5px; display: flex; flex-direction: column; gap: 10px; font-family: monospace; word-break: break-all; }
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; color: #333; }
+                .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+                h1, h3 { color: #2c3e50; margin-top: 0; }
+                ul { list-style: none; padding: 0; }
+                li { background: #e9ecef; margin: 10px 0; padding: 15px; border-radius: 4px; display: flex; flex-direction: column; gap: 10px; word-break: break-all; }
                 @media (min-width: 600px) {
                     li { flex-direction: row; justify-content: space-between; align-items: center; }
                 }
                 button { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; font-size: 1rem; }
                 button.danger { background: #dc3545; }
-                @media (min-width: 600px) {
-                    button { width: auto; }
-                }
+                @media (min-width: 600px) { button { width: auto; } }
                 input[type="text"] { padding: 10px; flex-grow: 1; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 1rem; }
                 .form-group { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
-                @media (min-width: 600px) {
-                    .form-group { flex-direction: row; }
-                }
+                @media (min-width: 600px) { .form-group { flex-direction: row; } }
+                .config-box { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 6px; font-family: monospace; white-space: pre-wrap; overflow-x: auto; margin-top: 10px; border: 1px solid #333; }
+                .key-highlight { font-weight: bold; color: #4CAF50; font-size: 1.1em; background: #e8f5e9; padding: 2px 6px; border-radius: 4px; border: 1px solid #c8e6c9; }
+                .badge { background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; }
             </style>
         </head>
         <body>
@@ -112,7 +83,30 @@ app.get('/', async (req, res) => {
                 <h1>🛡️ MCP Sandbox Security Dashboard</h1>
                 <p>Manage which directories the AI agent is allowed to access. Any path outside these directories will be strictly blocked.</p>
                 
-                <h3>Currently Allowed Directories</h3>
+                <h3>🔑 Server API Key</h3>
+                <p>This auto-generated key authenticates AI agents connecting to this server.</p>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6; margin-bottom: 20px;">
+                    <span class="key-highlight">${config.apiKey}</span>
+                </div>
+
+                <h3>🔌 Active AI Connections <span class="badge">${activeConnections.size}</span></h3>
+                <ul>
+                    ${activeConnections.size === 0 ? '<li><i>No active connections.</i></li>' : Array.from(activeConnections).map(ip => `<li>🟢 Connected Client IP: ${ip}</li>`).join('')}
+                </ul>
+
+                <h3>📋 Cursor / Claude Configuration</h3>
+                <p>Copy this JSON snippet into your AI agent's MCP settings:</p>
+                <div class="config-box">{
+  "mcpServers": {
+    "dmcps-aws": {
+      "command": "curl",
+      "args": ["-N", "-s", "-H", "Authorization: Bearer ${config.apiKey}", "http://YOUR_SERVER_IP:${PORT}/sse"]
+    }
+  }
+}</div>
+                <p><small><i>Raw Clients / Browsers: Use <code>http://YOUR_SERVER_IP:${PORT}/mcp?key=${config.apiKey}</code></i></small></p>
+                
+                <h3>📂 Currently Allowed Directories</h3>
                 ${config.allowedDirectories.length === 0 ? '<p><i>No directories allowed yet. The AI is completely locked out.</i></p>' : ''}
                 <ul>
                     ${config.allowedDirectories.map((dir, idx) => `
@@ -137,7 +131,7 @@ app.get('/', async (req, res) => {
     res.send(html);
 });
 
-app.post('/add', async (req, res) => {
+app.post('/add', authMiddleware, async (req, res) => {
     const dir = req.body.directory?.trim();
     if (dir) {
         const config = await loadConfig();
@@ -149,7 +143,7 @@ app.post('/add', async (req, res) => {
     res.redirect('/');
 });
 
-app.post('/remove', async (req, res) => {
+app.post('/remove', authMiddleware, async (req, res) => {
     const index = parseInt(req.body.index, 10);
     const config = await loadConfig();
     if (!isNaN(index) && index >= 0 && index < config.allowedDirectories.length) {
@@ -218,42 +212,61 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 });
 
-// ---------------- SSE TRANSPORT ----------------
+// ---------------- API KEY AUTH & SSE TRANSPORT ----------------
 let transport: SSEServerTransport;
 
-app.get('/sse', async (req, res) => {
-    console.log("New MCP Client connected via SSE");
+const mcpAuthMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const config = await loadConfig();
+    const providedKey = req.query.key || (req.headers.authorization || '').replace('Bearer ', '').trim();
+    
+    if (providedKey !== config.apiKey) {
+        return res.status(401).json({ error: "Unauthorized. Invalid or missing API Key. Check your dashboard for the correct key." });
+    }
+    next();
+};
+
+app.use(['/sse', '/message', '/mcp', '/mcp/message'], mcpAuthMiddleware);
+
+const handleSseConnection = async (req: express.Request, res: express.Response) => {
+    const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+    activeConnections.add(clientIp);
+    console.log(`New MCP Client connected via SSE from ${clientIp}`);
+    
     transport = new SSEServerTransport("/message", res);
     await mcpServer.connect(transport);
-});
 
-app.post('/message', async (req, res) => {
+    req.on('close', () => {
+        activeConnections.delete(clientIp);
+        console.log(`MCP Client disconnected: ${clientIp}`);
+    });
+};
+
+app.get('/sse', handleSseConnection);
+app.get('/mcp', handleSseConnection);
+
+const handleMessage = async (req: express.Request, res: express.Response) => {
     if (transport) {
         await transport.handlePostMessage(req, res);
     } else {
         res.status(503).send("SSE transport not initialized");
     }
-});
+};
 
-import ngrok from '@ngrok/ngrok';
+app.post('/message', handleMessage);
+app.post('/mcp/message', handleMessage);
 
 // ---------------- VERCEL / SERVERLESS EXPORT ----------------
-// If running on Vercel, we don't manually call app.listen(). We just export the app.
 if (!process.env.VERCEL) {
     app.listen(PORT, '0.0.0.0', async () => {
         console.log(`🚀 Secure Dashboard & MCP Server listening on port ${PORT}`);
-        console.log(`🌐 Local Dashboard: http://localhost:${PORT}/ (Requires Basic Auth user: admin)`);
-        console.log(`🔌 Local MCP Endpoint: http://localhost:${PORT}/sse`);
-
+        
         if (process.env.NGROK_AUTHTOKEN) {
             try {
-                console.log("🔄 Starting ngrok tunnel...");
                 const listener = await ngrok.forward({
                     addr: PORT,
                     authtoken: process.env.NGROK_AUTHTOKEN,
                 });
                 console.log(`🌍 Public ngrok Dashboard: ${listener.url()}/`);
-                console.log(`🌍 Public ngrok MCP Endpoint: ${listener.url()}/sse`);
             } catch (err) {
                 console.error("❌ Failed to start ngrok tunnel:", err);
             }
@@ -261,5 +274,4 @@ if (!process.env.VERCEL) {
     });
 }
 
-// Export for Vercel and Serverless environments
 export default app;

@@ -5,17 +5,30 @@ import * as path from "path";
 const defaultPath = process.env.VERCEL ? "/tmp/allowed_dirs.json" : "/app/config/allowed_dirs.json";
 const CONFIG_PATH = process.env.CONFIG_PATH || defaultPath;
 
+import { randomBytes } from 'crypto';
+
 export interface Config {
     allowedDirectories: string[];
+    apiKey: string;
 }
 
 export async function loadConfig(): Promise<Config> {
     try {
         const data = await fs.readFile(CONFIG_PATH, 'utf-8');
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+        if (!parsed.apiKey) {
+            parsed.apiKey = 'mcp_' + randomBytes(16).toString('hex');
+            await saveConfig(parsed);
+        }
+        return parsed;
     } catch {
         // Default safe config
-        return { allowedDirectories: [] };
+        const newConfig = { 
+            allowedDirectories: [], 
+            apiKey: 'mcp_' + randomBytes(16).toString('hex') 
+        };
+        await saveConfig(newConfig).catch(() => {});
+        return newConfig;
     }
 }
 
