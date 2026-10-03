@@ -12,7 +12,11 @@ export interface Config {
     apiKey: string;
 }
 
+let cachedConfig: Config | null = null;
+
 export async function loadConfig(): Promise<Config> {
+    if (cachedConfig) return cachedConfig;
+    
     try {
         const data = await fs.readFile(CONFIG_PATH, 'utf-8');
         const parsed = JSON.parse(data);
@@ -20,6 +24,7 @@ export async function loadConfig(): Promise<Config> {
             parsed.apiKey = 'mcp_' + randomBytes(16).toString('hex');
             await saveConfig(parsed);
         }
+        cachedConfig = parsed;
         return parsed;
     } catch {
         // Default safe config
@@ -28,13 +33,20 @@ export async function loadConfig(): Promise<Config> {
             apiKey: 'mcp_' + randomBytes(16).toString('hex') 
         };
         await saveConfig(newConfig).catch(() => {});
+        cachedConfig = newConfig;
         return newConfig;
     }
 }
 
 export async function saveConfig(config: Config): Promise<void> {
-    await fs.mkdir(path.dirname(CONFIG_PATH), { recursive: true });
-    await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+    cachedConfig = config;
+    try {
+        await fs.mkdir(path.dirname(CONFIG_PATH), { recursive: true });
+        await fs.writeFile(CONFIG_PATH, JSON.stringify(config, null, 2), 'utf-8');
+    } catch (err) {
+        // In read-only containers, writing will fail, but we've already cached it in memory!
+        console.warn('Could not persist config to disk, but it is cached in memory:', err);
+    }
 }
 
 /**
