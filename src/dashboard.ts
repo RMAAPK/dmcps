@@ -43,9 +43,17 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Parse URL-encoded bodies for form submissions and JSON for MCP requests
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json());
+// We MUST NOT use global body parsers for /message, because the MCP SDK needs to read the raw request stream!
+app.use((req, res, next) => {
+    if (req.path === '/message' || req.path === '/sse') {
+        return next();
+    }
+    // Only apply body parsing to the dashboard
+    express.urlencoded({ extended: true })(req, res, (err) => {
+        if (err) return next(err);
+        express.json()(req, res, next);
+    });
+});
 
 
 // Basic Authentication Middleware for Dashboard ONLY
