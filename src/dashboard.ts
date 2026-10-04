@@ -15,7 +15,24 @@ const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // ---------------- MIDDLEWARE & SECURITY ----------------
-app.use(helmet());
+// Use helmet but allow cross-origin resource sharing for web-based AI agents (like Spark)
+app.use(helmet({
+    crossOriginResourcePolicy: false,
+    crossOriginOpenerPolicy: false
+}));
+
+// CORS middleware for MCP endpoints
+const mcpCorsMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+        return;
+    }
+    next();
+};
+app.use(['/sse', '/message', '/mcp', '/mcp/message'], mcpCorsMiddleware);
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
