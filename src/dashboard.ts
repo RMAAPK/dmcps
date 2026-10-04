@@ -24,15 +24,38 @@ app.use(helmet({
 // CORS middleware for MCP endpoints
 const mcpCorsMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE, PATCH');
+    res.header('Access-Control-Allow-Headers', '*'); // Allow ALL headers for strict preflight checks
     if (req.method === 'OPTIONS') {
         res.sendStatus(200);
         return;
     }
     next();
 };
-app.use(['/sse', '/message', '/mcp', '/mcp/message'], mcpCorsMiddleware);
+app.use(['/sse', '/message', '/mcp', '/mcp/message', '/authorize', '/token'], mcpCorsMiddleware);
+
+// --- Dummy OAuth2 Flow for Strict AI Agents (Gemini/ChatGPT) ---
+app.get('/authorize', async (req, res) => {
+    // For agents that mandate an OAuth authorization flow, immediately redirect them back with a dummy code.
+    const redirectUri = req.query.redirect_uri as string;
+    const state = req.query.state as string;
+    if (redirectUri) {
+        res.redirect(`${redirectUri}?code=auth_code_dmcps&state=${state}`);
+    } else {
+        res.status(400).send("Missing redirect_uri");
+    }
+});
+
+app.post('/token', async (req, res) => {
+    // Exchange the dummy code for the actual MCP API Key as a Bearer token
+    const config = await loadConfig();
+    res.json({
+        access_token: config.apiKey,
+        token_type: "Bearer",
+        expires_in: 31536000 // 1 year
+    });
+});
+// ---------------------------------------------------------------
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -127,6 +150,13 @@ app.get('/', authMiddleware, async (req, res) => {
 }</div>
                 <p><small><i>Raw Clients / Browsers: Use <code>http://YOUR_SERVER_IP:${PORT}/mcp?key=${config.apiKey}</code></i></small></p>
                 
+                <h3>🤖 OAuth2 Config (Gemini/ChatGPT)</h3>
+                <p><small>For AI agents that strictly require OAuth2 (Authorization Code flow), use these Endpoints:</small></p>
+                <ul>
+                    <li><b>Authorization URL:</b> <code>http://YOUR_SERVER_IP:${PORT}/authorize</code></li>
+                    <li><b>Token URL:</b> <code>http://YOUR_SERVER_IP:${PORT}/token</code></li>
+                </ul>
+
                 <h3>📂 Currently Allowed Directories</h3>
                 ${config.allowedDirectories.length === 0 ? '<p><i>No directories allowed yet. The AI is completely locked out.</i></p>' : ''}
                 <ul>
