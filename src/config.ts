@@ -20,8 +20,8 @@ export async function loadConfig(): Promise<Config> {
     try {
         const data = await fs.readFile(CONFIG_PATH, 'utf-8');
         const parsed = JSON.parse(data);
-        if (!parsed.apiKey) {
-            parsed.apiKey = 'mcp_' + randomBytes(16).toString('hex');
+        if (!parsed.apiKey || process.env.MCP_API_KEY) {
+            parsed.apiKey = process.env.MCP_API_KEY || ('mcp_' + randomBytes(16).toString('hex'));
             await saveConfig(parsed);
         }
         cachedConfig = parsed;
@@ -30,7 +30,7 @@ export async function loadConfig(): Promise<Config> {
         // Default safe config
         const newConfig = { 
             allowedDirectories: [], 
-            apiKey: 'mcp_' + randomBytes(16).toString('hex') 
+            apiKey: process.env.MCP_API_KEY || ('mcp_' + randomBytes(16).toString('hex'))
         };
         await saveConfig(newConfig).catch(() => {});
         cachedConfig = newConfig;
