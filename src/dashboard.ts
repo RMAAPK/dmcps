@@ -217,7 +217,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 // ---------------- API KEY AUTH & SSE TRANSPORT ----------------
-let transport: SSEServerTransport;
+const transports = new Map<string, SSEServerTransport>();
 
 const mcpAuthMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const config = await loadConfig();
@@ -236,11 +236,19 @@ const handleSseConnection = async (req: express.Request, res: express.Response) 
     activeConnections.add(clientIp);
     console.log(`New MCP Client connected via SSE from ${clientIp}`);
     
-    transport = new SSEServerTransport("/message", res);
+    // Dynamically construct the POST endpoint so raw agents sending ?key= preserve their authentication
+    const basePath = req.path === '/mcp' ? '/mcp/message' : '/message';
+    const messageUrl = req.query.key ? `${basePath}?key=${req.query.key}` : basePath;
+    
+    const transport = new SSEServerTransport(messageUrl, res);
     await mcpServer.connect(transport);
+    
+    // Store the transport so the POST /message endpoint can find it
+    transports.set(transport.sessionId, transport);
 
     req.on('close', () => {
         activeConnections.delete(clientIp);
+        transports.delete(transport.sessionId);
         console.log(`MCP Client disconnected: ${clientIp}`);
     });
 };
@@ -249,10 +257,13 @@ app.get('/sse', handleSseConnection);
 app.get('/mcp', handleSseConnection);
 
 const handleMessage = async (req: express.Request, res: express.Response) => {
+    const sessionId = req.query.sessionId as string;
+    const transport = transports.get(sessionId);
+    
     if (transport) {
         await transport.handlePostMessage(req, res);
     } else {
-        res.status(503).send("SSE transport not initialized");
+        res.status(404).send("Session not found or expired");
     }
 };
 
