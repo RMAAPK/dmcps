@@ -15,7 +15,47 @@ const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // ---------------- MIDDLEWARE & SECURITY ----------------
-app.use(helmet());
+// Use helmet but allow cross-origin resource sharing for web-based AI agents (like Spark)
+app.use(helmet({
+    crossOriginResourcePolicy: false,
+    crossOriginOpenerPolicy: false
+}));
+
+// CORS middleware for MCP endpoints
+const mcpCorsMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE, PATCH');
+    res.header('Access-Control-Allow-Headers', '*'); // Allow ALL headers for strict preflight checks
+    if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+        return;
+    }
+    next();
+};
+app.use(['/sse', '/message', '/mcp', '/mcp/message', '/authorize', '/token'], mcpCorsMiddleware);
+
+// --- Dummy OAuth2 Flow for Strict AI Agents (Gemini/ChatGPT) ---
+app.get('/authorize', async (req, res) => {
+    // For agents that mandate an OAuth authorization flow, immediately redirect them back with a dummy code.
+    const redirectUri = req.query.redirect_uri as string;
+    const state = req.query.state as string;
+    if (redirectUri) {
+        res.redirect(`${redirectUri}?code=auth_code_dmcps&state=${state}`);
+    } else {
+        res.status(400).send("Missing redirect_uri");
+    }
+});
+
+app.post('/token', async (req, res) => {
+    // Exchange the dummy code for the actual MCP API Key as a Bearer token
+    const config = await loadConfig();
+    res.json({
+        access_token: config.apiKey,
+        token_type: "Bearer",
+        expires_in: 31536000 // 1 year
+    });
+});
+// ---------------------------------------------------------------
 
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -60,32 +100,132 @@ app.get('/', authMiddleware, async (req, res) => {
         <!DOCTYPE html>
         <html>
         <head>
-            <title>DMCPS Dashboard</title>
+            <title>DMCPS Dashboard - Ali CNC Edge</title>
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f4f9; margin: 0; padding: 20px; color: #333; }
-                .container { max-width: 800px; margin: auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-                h1, h3 { color: #2c3e50; margin-top: 0; }
+                :root {
+                    --bg-dark: #05080e;
+                    --glass-bg: rgba(10, 14, 23, 0.85);
+                    --glass-border: rgba(235, 94, 40, 0.35);
+                    --accent-color: #EB5E28;
+                    --text-primary: #e2e8f0;
+                    --text-secondary: #94a3b8;
+                }
+                body { 
+                    font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+                    background: var(--bg-dark);
+                    background-image: radial-gradient(circle at 30% 30%, rgba(235, 94, 40, 0.05) 0%, rgba(5, 8, 14, 0.95) 100%);
+                    margin: 0; 
+                    padding: clamp(10px, 3vw, 20px); 
+                    color: var(--text-primary); 
+                    min-height: 100vh;
+                }
+                .container { 
+                    max-width: 900px; 
+                    margin: auto; 
+                    background: var(--glass-bg); 
+                    padding: clamp(20px, 5vw, 40px); 
+                    border-radius: 20px; 
+                    border: 1px solid var(--glass-border);
+                    box-shadow: 0 20px 60px -15px rgba(235, 94, 40, 0.25), 0 0 30px rgba(0, 0, 0, 0.8);
+                    backdrop-filter: blur(20px);
+                    -webkit-backdrop-filter: blur(20px);
+                }
+                h1, h3 { color: #fff; margin-top: 0; font-weight: 600; letter-spacing: 0.5px; }
+                h1 { font-size: clamp(1.5rem, 4vw, 2rem); margin-bottom: 2rem; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 1rem;}
+                h3 { margin-top: 2rem; }
                 ul { list-style: none; padding: 0; }
-                li { background: #e9ecef; margin: 10px 0; padding: 15px; border-radius: 4px; display: flex; flex-direction: column; gap: 10px; word-break: break-all; }
+                li { 
+                    background: rgba(0, 0, 0, 0.4); 
+                    margin: 10px 0; 
+                    padding: 15px; 
+                    border-radius: 10px; 
+                    border: 1px solid rgba(255, 255, 255, 0.05);
+                    display: flex; 
+                    flex-direction: column; 
+                    gap: 10px; 
+                    word-break: break-all; 
+                }
                 @media (min-width: 600px) {
                     li { flex-direction: row; justify-content: space-between; align-items: center; }
                 }
-                button { background: #007bff; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; width: 100%; font-size: 1rem; }
-                button.danger { background: #dc3545; }
+                button { 
+                    background: var(--accent-color); 
+                    color: white; 
+                    border: none; 
+                    padding: 12px 20px; 
+                    border-radius: 8px; 
+                    cursor: pointer; 
+                    width: 100%; 
+                    font-size: 1rem;
+                    font-weight: 600;
+                    transition: all 0.2s ease;
+                }
+                button:hover { background: #d4511e; transform: translateY(-1px); }
+                button.danger { background: rgba(220, 53, 69, 0.2); border: 1px solid #dc3545; color: #ff6b7a; }
+                button.danger:hover { background: #dc3545; color: white; }
                 @media (min-width: 600px) { button { width: auto; } }
-                input[type="text"] { padding: 10px; flex-grow: 1; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 1rem; }
+                
+                input[type="text"] { 
+                    padding: 12px 16px; 
+                    flex-grow: 1; 
+                    background: rgba(255, 255, 255, 0.05);
+                    border: 1px solid var(--glass-border);
+                    color: var(--text-primary);
+                    border-radius: 8px; 
+                    font-family: monospace; 
+                    font-size: 1rem; 
+                    transition: border-color 0.2s;
+                }
+                input[type="text"]:focus { outline: none; border-color: var(--accent-color); background: rgba(255, 255, 255, 0.1); }
+                
                 .form-group { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
                 @media (min-width: 600px) { .form-group { flex-direction: row; } }
-                .config-box { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 6px; font-family: monospace; white-space: pre-wrap; overflow-x: auto; margin-top: 10px; border: 1px solid #333; }
-                .key-highlight { font-weight: bold; color: #4CAF50; font-size: 1.1em; background: #e8f5e9; padding: 2px 6px; border-radius: 4px; border: 1px solid #c8e6c9; }
-                .badge { background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 0.8em; }
+                
+                .config-box { 
+                    background: rgba(0, 0, 0, 0.6); 
+                    color: #4ade80; 
+                    padding: 15px; 
+                    border-radius: 10px; 
+                    font-family: monospace; 
+                    white-space: pre-wrap; 
+                    overflow-x: auto; 
+                    margin-top: 10px; 
+                    border: 1px solid rgba(255, 255, 255, 0.05); 
+                }
+                .key-highlight { 
+                    font-weight: bold; 
+                    color: #EB5E28; 
+                    font-size: clamp(0.9rem, 2.5vw, 1.2rem); 
+                    background: rgba(235, 94, 40, 0.1); 
+                    padding: 4px 10px; 
+                    border-radius: 6px; 
+                    border: 1px solid rgba(235, 94, 40, 0.3); 
+                    word-break: break-all;
+                }
+                .badge { 
+                    background: rgba(34, 197, 94, 0.15); 
+                    color: #4ade80; 
+                    border: 1px solid rgba(34, 197, 94, 0.3);
+                    padding: 3px 10px; 
+                    border-radius: 12px; 
+                    font-size: 0.8em; 
+                    margin-left: 10px;
+                }
+                .status-dot { color: #22c55e; margin-right: 8px; }
+                
+                code {
+                    background: rgba(255, 255, 255, 0.1);
+                    padding: 2px 6px;
+                    border-radius: 4px;
+                    color: #eab308;
+                }
             </style>
         </head>
         <body>
             <div class="container">
-                <h1>🛡️ MCP Sandbox Security Dashboard</h1>
-                <p>Manage which directories the AI agent is allowed to access. Any path outside these directories will be strictly blocked.</p>
+                <h1>⚙️ Ali CNC Forge AI - Sandbox Security</h1>
+                <p style="color: var(--text-secondary); margin-bottom: 30px;">Manage which directories the AI agent is allowed to access. Any path outside these directories will be strictly blocked at the kernel level.</p>
                 
                 <h3>🔑 Server API Key</h3>
                 <p>This auto-generated key authenticates AI agents connecting to this server.</p>
@@ -95,7 +235,7 @@ app.get('/', authMiddleware, async (req, res) => {
 
                 <h3>🔌 Active AI Connections <span class="badge">${activeConnections.size}</span></h3>
                 <ul>
-                    ${activeConnections.size === 0 ? '<li><i>No active connections.</i></li>' : Array.from(activeConnections).map(ip => `<li>🟢 Connected Client IP: ${ip}</li>`).join('')}
+                    ${activeConnections.size === 0 ? '<li><i style="color: var(--text-secondary);">No active connections.</i></li>' : Array.from(activeConnections).map(ip => `<li><div><span class="status-dot">●</span> Connected Client IP: <code style="color: #60a5fa;">${ip}</code></div></li>`).join('')}
                 </ul>
 
                 <h3>📋 Cursor / Claude Configuration</h3>
@@ -110,6 +250,13 @@ app.get('/', authMiddleware, async (req, res) => {
 }</div>
                 <p><small><i>Raw Clients / Browsers: Use <code>http://YOUR_SERVER_IP:${PORT}/mcp?key=${config.apiKey}</code></i></small></p>
                 
+                <h3>🤖 OAuth2 Config (Gemini/ChatGPT)</h3>
+                <p><small>For AI agents that strictly require OAuth2 (Authorization Code flow), use these Endpoints:</small></p>
+                <ul>
+                    <li><b>Authorization URL:</b> <code>http://YOUR_SERVER_IP:${PORT}/authorize</code></li>
+                    <li><b>Token URL:</b> <code>http://YOUR_SERVER_IP:${PORT}/token</code></li>
+                </ul>
+
                 <h3>📂 Currently Allowed Directories</h3>
                 ${config.allowedDirectories.length === 0 ? '<p><i>No directories allowed yet. The AI is completely locked out.</i></p>' : ''}
                 <ul>
@@ -217,7 +364,7 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 // ---------------- API KEY AUTH & SSE TRANSPORT ----------------
-let transport: SSEServerTransport;
+const transports = new Map<string, SSEServerTransport>();
 
 const mcpAuthMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const config = await loadConfig();
@@ -236,11 +383,19 @@ const handleSseConnection = async (req: express.Request, res: express.Response) 
     activeConnections.add(clientIp);
     console.log(`New MCP Client connected via SSE from ${clientIp}`);
     
-    transport = new SSEServerTransport("/message", res);
+    // Dynamically construct the POST endpoint so raw agents sending ?key= preserve their authentication
+    const basePath = req.path === '/mcp' ? '/mcp/message' : '/message';
+    const messageUrl = req.query.key ? `${basePath}?key=${req.query.key}` : basePath;
+    
+    const transport = new SSEServerTransport(messageUrl, res);
     await mcpServer.connect(transport);
+    
+    // Store the transport so the POST /message endpoint can find it
+    transports.set(transport.sessionId, transport);
 
     req.on('close', () => {
         activeConnections.delete(clientIp);
+        transports.delete(transport.sessionId);
         console.log(`MCP Client disconnected: ${clientIp}`);
     });
 };
@@ -249,10 +404,13 @@ app.get('/sse', handleSseConnection);
 app.get('/mcp', handleSseConnection);
 
 const handleMessage = async (req: express.Request, res: express.Response) => {
+    const sessionId = req.query.sessionId as string;
+    const transport = transports.get(sessionId);
+    
     if (transport) {
         await transport.handlePostMessage(req, res);
     } else {
-        res.status(503).send("SSE transport not initialized");
+        res.status(404).send("Session not found or expired");
     }
 };
 
