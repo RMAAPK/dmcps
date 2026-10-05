@@ -486,10 +486,18 @@ app.post('/sse', async (req, res) => {
         console.log("=== GEMINI POST /sse BODY ===");
         console.log(body);
         console.log("=============================");
+        
+        // Find the latest log entry for this request and inject the raw body
+        const logEntry = debugLogs.find(l => l.path === '/sse' && l.method === 'POST' && !l.requestBody);
+        if (logEntry) {
+            logEntry.requestBody = body;
+        }
+
         // For now, we will return a dummy error so we can just see the log.
         res.status(500).json({ error: "Diagnostic capture" });
     });
 });
+
 
 
 const handleMessage = async (req: express.Request, res: express.Response) => {
