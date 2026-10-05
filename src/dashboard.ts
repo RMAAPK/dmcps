@@ -76,6 +76,12 @@ app.get('/.well-known/oauth-authorization-server', (req, res) => {
     });
 });
 
+app.get('/.well-known/*', (req, res) => {
+    // Catch-all for any other discovery endpoints Google attempts to hit (like UMA protected-resource)
+    // Returns empty JSON to prevent Google's crawler from crashing on Express's default HTML 404 page
+    res.json({});
+});
+
 app.get('/authorize', async (req, res) => {
     // For agents that mandate an OAuth authorization flow, immediately redirect them back with a dummy code.
     const redirectUri = req.query.redirect_uri as string;
@@ -92,17 +98,21 @@ app.get('/authorize', async (req, res) => {
 
 // OAuth providers send token requests as application/x-www-form-urlencoded
 app.post('/token', express.urlencoded({ extended: true }), async (req, res) => {
-    // Exchange the dummy code for the actual MCP API Key as a Bearer token
-    const config = await loadConfig();
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Pragma', 'no-cache');
-    res.json({
-        access_token: config.apiKey,
-        token_type: "bearer",
-        expires_in: 3600, // 1 hour (Google sometimes rejects overly large expirations)
-        refresh_token: config.apiKey, // Google strictly requires this for offline account linking
-        scope: "mcp"
-    });
+    try {
+        const config = await loadConfig();
+        res.setHeader('Content-Type', 'application/json;charset=UTF-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Pragma', 'no-cache');
+        res.status(200).send(JSON.stringify({
+            access_token: config.apiKey,
+            token_type: "Bearer",
+            expires_in: 3600, // 1 hour
+            refresh_token: config.apiKey + "_refresh", // Must be distinct from access_token for strict validators
+            scope: "mcp"
+        }));
+    } catch (e) {
+        res.status(500).json({ error: "internal_server_error" });
+    }
 });
 // ---------------------------------------------------------------
 
