@@ -14,6 +14,34 @@ const execAsync = promisify(exec);
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
+// --- DEBUG LOGGER FOR GOOGLE OAUTH ---
+const debugLogs: any[] = [];
+app.use((req, res, next) => {
+    // We log everything except standard dashboard assets or sse to avoid spam
+    if (!req.path.startsWith('/sse') && !req.path.startsWith('/mcp') && req.path !== '/') {
+        let bodyToLog = req.body;
+        if (req.headers['content-type'] === 'application/x-www-form-urlencoded' && !bodyToLog) {
+            // Body might not be parsed yet, wait for response finish
+        }
+        const logEntry = {
+            time: new Date().toISOString(),
+            method: req.method,
+            path: req.path,
+            query: req.query,
+            headers: req.headers,
+            body: bodyToLog
+        };
+        debugLogs.push(logEntry);
+        if (debugLogs.length > 50) debugLogs.shift();
+    }
+    next();
+});
+
+app.get('/debug-logs', (req, res) => {
+    res.json(debugLogs);
+});
+// ------------------------------------
+
 // ---------------- MIDDLEWARE & SECURITY ----------------
 // Use helmet but allow cross-origin resource sharing for web-based AI agents (like Spark)
 app.use(helmet({
