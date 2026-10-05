@@ -17,7 +17,7 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 // --- DEBUG LOGGER FOR GOOGLE OAUTH ---
 const debugLogs: any[] = [];
 app.use((req, res, next) => {
-    if (!req.path.startsWith('/sse') && !req.path.startsWith('/mcp') && req.path !== '/') {
+    if (req.path !== '/') {
         const logEntry: any = {
             time: new Date().toISOString(),
             method: req.method,
@@ -458,8 +458,11 @@ async function handleSseConnection(req: express.Request, res: express.Response) 
     // Dynamically construct the POST endpoint so raw agents sending ?key= preserve their authentication
     const basePath = req.path === '/mcp' ? '/mcp/message' : (req.path === '/' ? '/message' : '/message');
     const messageUrl = req.query.key ? `${basePath}?key=${req.query.key}` : basePath;
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.get('host') || 'dmcps.onrender.com';
+    const absoluteMessageUrl = `${protocol}://${host}${messageUrl}`;
     
-    const transport = new SSEServerTransport(messageUrl, res);
+    const transport = new SSEServerTransport(absoluteMessageUrl, res);
     await mcpServer.connect(transport);
     
     // Store the transport so the POST /message endpoint can find it
