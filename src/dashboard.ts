@@ -17,20 +17,25 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 // --- DEBUG LOGGER FOR GOOGLE OAUTH ---
 const debugLogs: any[] = [];
 app.use((req, res, next) => {
-    // We log everything except standard dashboard assets or sse to avoid spam
     if (!req.path.startsWith('/sse') && !req.path.startsWith('/mcp') && req.path !== '/') {
-        let bodyToLog = req.body;
-        if (req.headers['content-type'] === 'application/x-www-form-urlencoded' && !bodyToLog) {
-            // Body might not be parsed yet, wait for response finish
-        }
-        const logEntry = {
+        const logEntry: any = {
             time: new Date().toISOString(),
             method: req.method,
             path: req.path,
             query: req.query,
-            headers: req.headers,
-            body: bodyToLog
+            headers: req.headers
         };
+        
+        // Hook into response finish to capture status and body
+        const originalSend = res.send;
+        res.send = function (body) {
+            logEntry.responseStatus = res.statusCode;
+            logEntry.responseBody = body ? body.toString() : null;
+            // Capture request body here as it might have been parsed by middleware
+            logEntry.requestBody = req.body;
+            return originalSend.apply(this, arguments as any);
+        };
+        
         debugLogs.push(logEntry);
         if (debugLogs.length > 50) debugLogs.shift();
     }
