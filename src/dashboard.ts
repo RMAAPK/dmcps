@@ -70,8 +70,9 @@ app.post('/token', express.urlencoded({ extended: true }), async (req, res) => {
     res.setHeader('Pragma', 'no-cache');
     res.json({
         access_token: config.apiKey,
-        token_type: "Bearer",
-        expires_in: 31536000, // 1 year
+        token_type: "bearer",
+        expires_in: 3600, // 1 hour (Google sometimes rejects overly large expirations)
+        refresh_token: config.apiKey, // Google strictly requires this for offline account linking
         scope: "mcp"
     });
 });
