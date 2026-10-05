@@ -64,7 +64,7 @@ const mcpCorsMiddleware = (req: express.Request, res: express.Response, next: ex
     }
     next();
 };
-app.use(['/sse', '/message', '/mcp', '/mcp/message', '/authorize', '/token'], mcpCorsMiddleware);
+app.use(['/sse', '/message', '/mcp', '/mcp/message', '/authorize', '/token', '/gemini', '/gemini-body'], mcpCorsMiddleware);
 
 // --- Dummy OAuth2 Flow for Strict AI Agents (Gemini/ChatGPT) ---
 app.get('/.well-known/oauth-authorization-server', (req, res) => {
@@ -131,7 +131,7 @@ app.use(limiter);
 
 // We MUST NOT use global body parsers for /message or /mcp/message, because the MCP SDK needs to read the raw request stream!
 app.use((req, res, next) => {
-    if (req.path === '/message' || req.path === '/sse' || req.path.startsWith('/mcp')) {
+    if (req.path === '/message' || req.path === '/sse' || req.path.startsWith('/mcp') || req.path.startsWith('/gemini')) {
         return next();
     }
     // Only apply body parsing to the dashboard
@@ -479,22 +479,18 @@ app.get('/sse', handleSseConnection);
 app.get('/mcp', handleSseConnection);
 
 // --- GEMINI MCP POST DIAGNOSTIC ---
+let lastGeminiBody = '';
+app.head(['/sse', '/mcp', '/gemini'], (req, res) => res.status(200).send());
+app.get('/gemini', (req, res) => res.status(200).send());
+app.get('/gemini-body', (req, res) => res.status(200).send(lastGeminiBody));
+
 app.post(['/sse', '/mcp', '/gemini'], async (req, res) => {
     let body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', () => {
-        console.log("=== GEMINI POST /sse BODY ===");
-        console.log(body);
-        console.log("=============================");
-        
-        // Find the latest log entry for this request and inject the raw body
-        const logEntry = debugLogs.find(l => l.path === '/sse' && l.method === 'POST' && !l.requestBody);
-        if (logEntry) {
-            logEntry.requestBody = body;
-        }
-
-        // For now, we will return a dummy error so we can just see the log.
-        res.status(500).json({ error: "Diagnostic capture" });
+        lastGeminiBody = body;
+        console.log("=== GEMINI POST BODY ===", body);
+        res.status(200).json({ error: "Diagnostic capture" });
     });
 });
 
