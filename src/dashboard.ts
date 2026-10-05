@@ -6,7 +6,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
+import { CallToolRequestSchema, ListToolsRequestSchema, JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import { loadConfig, saveConfig, isPathAllowed } from './config.js';
 import ngrok from '@ngrok/ngrok';
 
@@ -379,59 +380,63 @@ app.post('/remove', authMiddleware, async (req, res) => {
 
 const mcpServer = new Server({ name: "secure-sandbox-mcp", version: "1.0.0" }, { capabilities: { tools: {} } });
 
-mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
-    return {
-        tools: [
-            { name: "read_file", description: "Read a file", inputSchema: { type: "object", properties: { filePath: { type: "string" } }, required: ["filePath"] } },
-            { name: "write_file", description: "Write content to a file", inputSchema: { type: "object", properties: { filePath: { type: "string" }, content: { type: "string" } }, required: ["filePath", "content"] } },
-            { name: "list_directory", description: "List files and directories", inputSchema: { type: "object", properties: { dirPath: { type: "string" } }, required: ["dirPath"] } },
-            { name: "run_shell_command", description: "Run a shell command", inputSchema: { type: "object", properties: { command: { type: "string" }, cwd: { type: "string", description: "Directory to run command in" } }, required: ["command", "cwd"] } },
-        ],
-    };
-});
-
 async function checkAccess(targetPath: string) {
     if (!(await isPathAllowed(targetPath))) {
         throw new Error(`SECURITY EXCEPTION: Access to path '${targetPath}' is explicitly denied by dashboard configuration.`);
     }
 }
 
-mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
-    try {
-        switch (request.params.name) {
-            case "read_file": {
-                const filePath = String(request.params.arguments?.filePath);
-                await checkAccess(filePath);
-                const content = await fs.readFile(filePath, "utf-8");
-                return { content: [{ type: "text", text: content }] };
+function setupServer(server: Server) {
+    server.setRequestHandler(ListToolsRequestSchema, async () => {
+        return {
+            tools: [
+                { name: "read_file", description: "Read a file", inputSchema: { type: "object", properties: { filePath: { type: "string" } }, required: ["filePath"] } },
+                { name: "write_file", description: "Write content to a file", inputSchema: { type: "object", properties: { filePath: { type: "string" }, content: { type: "string" } }, required: ["filePath", "content"] } },
+                { name: "list_directory", description: "List files and directories", inputSchema: { type: "object", properties: { dirPath: { type: "string" } }, required: ["dirPath"] } },
+                { name: "run_shell_command", description: "Run a shell command", inputSchema: { type: "object", properties: { command: { type: "string" }, cwd: { type: "string", description: "Directory to run command in" } }, required: ["command", "cwd"] } },
+            ],
+        };
+    });
+
+    server.setRequestHandler(CallToolRequestSchema, async (request) => {
+        try {
+            switch (request.params.name) {
+                case "read_file": {
+                    const filePath = String(request.params.arguments?.filePath);
+                    await checkAccess(filePath);
+                    const content = await fs.readFile(filePath, "utf-8");
+                    return { content: [{ type: "text", text: content }] };
+                }
+                case "write_file": {
+                    const filePath = String(request.params.arguments?.filePath);
+                    await checkAccess(filePath);
+                    await fs.writeFile(filePath, String(request.params.arguments?.content), "utf-8");
+                    return { content: [{ type: "text", text: `Wrote successfully to ${filePath}` }] };
+                }
+                case "list_directory": {
+                    const dirPath = String(request.params.arguments?.dirPath);
+                    await checkAccess(dirPath);
+                    const files = await fs.readdir(dirPath, { withFileTypes: true });
+                    const list = files.map(f => `${f.isDirectory() ? '[DIR]' : '[FILE]'} ${f.name}`).join('\n');
+                    return { content: [{ type: "text", text: list || "(empty directory)" }] };
+                }
+                case "run_shell_command": {
+                    const cwd = String(request.params.arguments?.cwd);
+                    await checkAccess(cwd);
+                    const command = String(request.params.arguments?.command);
+                    const { stdout, stderr } = await execAsync(command, { cwd });
+                    return { content: [{ type: "text", text: `STDOUT:\n${stdout}\nSTDERR:\n${stderr}` }] };
+                }
+                default:
+                    throw new Error(`Unknown tool: ${request.params.name}`);
             }
-            case "write_file": {
-                const filePath = String(request.params.arguments?.filePath);
-                await checkAccess(filePath);
-                await fs.writeFile(filePath, String(request.params.arguments?.content), "utf-8");
-                return { content: [{ type: "text", text: `Wrote successfully to ${filePath}` }] };
-            }
-            case "list_directory": {
-                const dirPath = String(request.params.arguments?.dirPath);
-                await checkAccess(dirPath);
-                const files = await fs.readdir(dirPath, { withFileTypes: true });
-                const list = files.map(f => `${f.isDirectory() ? '[DIR]' : '[FILE]'} ${f.name}`).join('\n');
-                return { content: [{ type: "text", text: list || "(empty directory)" }] };
-            }
-            case "run_shell_command": {
-                const cwd = String(request.params.arguments?.cwd);
-                await checkAccess(cwd);
-                const command = String(request.params.arguments?.command);
-                const { stdout, stderr } = await execAsync(command, { cwd });
-                return { content: [{ type: "text", text: `STDOUT:\n${stdout}\nSTDERR:\n${stderr}` }] };
-            }
-            default:
-                throw new Error(`Unknown tool: ${request.params.name}`);
+        } catch (e: any) {
+            return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
         }
-    } catch (e: any) {
-        return { content: [{ type: "text", text: `Error: ${e.message}` }], isError: true };
-    }
-});
+    });
+}
+
+setupServer(mcpServer);
 
 // ---------------- API KEY AUTH & SSE TRANSPORT ----------------
 const transports = new Map<string, SSEServerTransport>();
@@ -478,21 +483,85 @@ async function handleSseConnection(req: express.Request, res: express.Response) 
 app.get('/sse', handleSseConnection);
 app.get('/mcp', handleSseConnection);
 
-// --- GEMINI MCP POST DIAGNOSTIC ---
-let lastGeminiBody = '';
+// --- GEMINI STREAMABLE HTTP TRANSPORT ---
+class GeminiHttpTransport implements Transport {
+    onclose?: () => void;
+    onerror?: (error: Error) => void;
+    onmessage?: (message: any) => void;
+    
+    private pendingReqs = new Map<number | string, express.Response>();
+    private initialized = false;
+    
+    async start() {}
+    async close() {}
+    
+    async send(message: any) {
+        if (message.id !== undefined && this.pendingReqs.has(message.id)) {
+            const res = this.pendingReqs.get(message.id)!;
+            if (!res.headersSent) {
+                res.status(200).json(message);
+            }
+            this.pendingReqs.delete(message.id);
+        }
+    }
+    
+    handleRequest(message: any, res: express.Response) {
+        if (message.id !== undefined) {
+            this.pendingReqs.set(message.id, res);
+        }
+        
+        if (message.method === "initialize" && this.initialized) {
+            // Short-circuit if already initialized to prevent Server crash
+            this.send({
+                jsonrpc: "2.0",
+                id: message.id,
+                result: {
+                    protocolVersion: "2024-11-05",
+                    capabilities: { tools: {} },
+                    serverInfo: { name: "secure-sandbox-mcp", version: "1.0.0" }
+                }
+            });
+            return;
+        }
+        
+        if (message.method === "initialize") {
+            this.initialized = true;
+        }
+        
+        if (message.method === "notifications/initialized") {
+            // Notifications don't have IDs, so we just acknowledge it with HTTP 200
+            res.status(200).send();
+            if (this.onmessage) this.onmessage(message);
+            return;
+        }
+        
+        if (this.onmessage) {
+            this.onmessage(message);
+        }
+    }
+}
+
+const geminiTransport = new GeminiHttpTransport();
+const geminiMcpServer = new Server({ name: "secure-sandbox-mcp", version: "1.0.0" }, { capabilities: { tools: {} } });
+setupServer(geminiMcpServer);
+geminiMcpServer.connect(geminiTransport);
+
 app.head(['/sse', '/mcp', '/gemini'], (req, res) => res.status(200).send());
 app.get('/gemini', (req, res) => res.status(200).send());
-app.get('/gemini-body', (req, res) => res.status(200).send(lastGeminiBody));
 
 app.post(['/sse', '/mcp', '/gemini'], async (req, res) => {
     let body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', () => {
-        lastGeminiBody = body;
-        console.log("=== GEMINI POST BODY ===", body);
-        res.status(200).json({ error: "Diagnostic capture" });
+        try {
+            const message = JSON.parse(body);
+            geminiTransport.handleRequest(message, res);
+        } catch (e) {
+            if (!res.headersSent) res.status(400).send("Invalid JSON-RPC");
+        }
     });
 });
+
 
 
 
