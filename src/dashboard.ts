@@ -26,15 +26,11 @@ app.use((req, res, next) => {
             headers: req.headers
         };
         
-        // Hook into response finish to capture status and body
-        const originalSend = res.send;
-        res.send = function (body) {
+        // Use the 'finish' event to reliably capture the status code and parsed body
+        res.on('finish', () => {
             logEntry.responseStatus = res.statusCode;
-            logEntry.responseBody = body ? body.toString() : null;
-            // Capture request body here as it might have been parsed by middleware
             logEntry.requestBody = req.body;
-            return originalSend.apply(this, arguments as any);
-        };
+        });
         
         debugLogs.push(logEntry);
         if (debugLogs.length > 50) debugLogs.shift();
@@ -102,7 +98,7 @@ app.get('/authorize', async (req, res) => {
 });
 
 // OAuth providers send token requests as application/x-www-form-urlencoded
-app.post('/token', express.urlencoded({ extended: true }), async (req, res) => {
+app.post('/token', async (req, res) => {
     try {
         const config = await loadConfig();
         res.setHeader('Content-Type', 'application/json;charset=UTF-8');
