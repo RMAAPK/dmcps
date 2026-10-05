@@ -80,7 +80,7 @@ app.get('/.well-known/oauth-authorization-server', (req, res) => {
     });
 });
 
-app.get('/.well-known/*', (req, res) => {
+app.use('/.well-known', (req, res) => {
     // Catch-all for any other discovery endpoints Google attempts to hit (like UMA protected-resource)
     // Returns empty JSON to prevent Google's crawler from crashing on Express's default HTML 404 page
     res.json({});
