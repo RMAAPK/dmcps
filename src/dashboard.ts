@@ -478,6 +478,20 @@ async function handleSseConnection(req: express.Request, res: express.Response) 
 app.get('/sse', handleSseConnection);
 app.get('/mcp', handleSseConnection);
 
+// --- GEMINI MCP POST DIAGNOSTIC ---
+app.post('/sse', async (req, res) => {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+        console.log("=== GEMINI POST /sse BODY ===");
+        console.log(body);
+        console.log("=============================");
+        // For now, we will return a dummy error so we can just see the log.
+        res.status(500).json({ error: "Diagnostic capture" });
+    });
+});
+
+
 const handleMessage = async (req: express.Request, res: express.Response) => {
     const sessionId = req.query.sessionId as string;
     const transport = transports.get(sessionId);
