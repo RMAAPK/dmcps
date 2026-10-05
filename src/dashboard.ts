@@ -479,7 +479,7 @@ app.get('/sse', handleSseConnection);
 app.get('/mcp', handleSseConnection);
 
 // --- GEMINI MCP POST DIAGNOSTIC ---
-app.post(['/sse', '/mcp'], async (req, res) => {
+app.post(['/sse', '/mcp', '/gemini'], async (req, res) => {
     let body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', () => {
