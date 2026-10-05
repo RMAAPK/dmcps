@@ -54,7 +54,7 @@ app.get('/authorize', async (req, res) => {
     const state = req.query.state as string;
     if (redirectUri) {
         const url = new URL(redirectUri);
-        url.searchParams.set('code', 'auth_code_dmcps');
+        url.searchParams.set('code', 'auth_code_' + Math.random().toString(36).substring(2));
         if (state) url.searchParams.set('state', state);
         res.redirect(url.toString());
     } else {
@@ -115,7 +115,14 @@ const authMiddleware = (req: express.Request, res: express.Response, next: expre
 // ---------------- DASHBOARD UI ----------------
 const activeConnections = new Set<string>();
 
-app.get('/', authMiddleware, async (req, res) => {
+app.get('/', (req, res, next) => {
+    if (req.headers.accept && req.headers.accept.includes('text/event-stream')) {
+        // It's Gemini or an AI Agent trying to connect to the MCP server at the root URL
+        return mcpAuthMiddleware(req, res, () => handleSseConnection(req, res));
+    }
+    // Otherwise, it's a human, so require Basic Auth and show dashboard
+    authMiddleware(req, res, next);
+}, async (req, res) => {
     const config = await loadConfig();
     const html = `
         <!DOCTYPE html>
@@ -387,25 +394,27 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
 // ---------------- API KEY AUTH & SSE TRANSPORT ----------------
 const transports = new Map<string, SSEServerTransport>();
 
-const mcpAuthMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+async function mcpAuthMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
     const config = await loadConfig();
-    const providedKey = req.query.key || (req.headers.authorization || '').replace('Bearer ', '').trim();
+    const authHeader = req.headers.authorization || '';
+    const match = authHeader.match(/^Bearer\s+(.*)$/i); // Case insensitive match for Google
+    const providedKey = req.query.key || (match ? match[1] : '').trim();
     
     if (providedKey !== config.apiKey) {
         return res.status(401).json({ error: "Unauthorized. Invalid or missing API Key. Check your dashboard for the correct key." });
     }
     next();
-};
+}
 
 app.use(['/sse', '/message', '/mcp', '/mcp/message'], mcpAuthMiddleware);
 
-const handleSseConnection = async (req: express.Request, res: express.Response) => {
+async function handleSseConnection(req: express.Request, res: express.Response) {
     const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
     activeConnections.add(clientIp);
     console.log(`New MCP Client connected via SSE from ${clientIp}`);
     
     // Dynamically construct the POST endpoint so raw agents sending ?key= preserve their authentication
-    const basePath = req.path === '/mcp' ? '/mcp/message' : '/message';
+    const basePath = req.path === '/mcp' ? '/mcp/message' : (req.path === '/' ? '/message' : '/message');
     const messageUrl = req.query.key ? `${basePath}?key=${req.query.key}` : basePath;
     
     const transport = new SSEServerTransport(messageUrl, res);
@@ -419,7 +428,7 @@ const handleSseConnection = async (req: express.Request, res: express.Response) 
         transports.delete(transport.sessionId);
         console.log(`MCP Client disconnected: ${clientIp}`);
     });
-};
+}
 
 app.get('/sse', handleSseConnection);
 app.get('/mcp', handleSseConnection);
