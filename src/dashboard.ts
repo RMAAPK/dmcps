@@ -39,7 +39,10 @@ app.use((req, res, next) => {
 });
 
 app.get('/debug-logs', (req, res) => {
-    res.json(debugLogs);
+    res.json({
+        version: "v3-no-body-parser",
+        logs: debugLogs
+    });
 });
 // ------------------------------------
 
