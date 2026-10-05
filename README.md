@@ -107,3 +107,19 @@ Once authenticated and restricted to a whitelisted folder, the AI has access to:
 2. `write_file` - Write content to a file.
 3. `list_directory` - List all files in a folder.
 4. `run_shell_command` - Execute terminal commands strictly within the isolated workspace.
+
+## 🚀 The Revolution: "Cursor on your Phone" (Gemini Mobile)
+This server features a custom **Streamable HTTP Transport Adapter** designed specifically to bypass Google's aggressive caching and seamlessly hook into the Gemini mobile app (and web app). 
+
+You can now turn your phone into a full-fledged cloud coding environment, giving Gemini arbitrary filesystem and shell execution access on your machine!
+
+### How to Connect to Gemini
+1. Open the Gemini App (or gemini.google.com).
+2. Go to **Settings > Connected Apps**.
+3. Scroll to the bottom and click **Add a custom app** under "Custom apps for Spark".
+4. When prompted for the **MCP Server URL**, enter your server's endpoint:
+   👉 `https://YOUR-APP-URL.onrender.com/gemini`
+5. (If prompted for a Client ID or Secret, just leave them blank or enter dummy text — our custom OAuth bypass handles it automatically).
+6. Click Connect!
+
+Once connected, you can open a chat with Gemini on your phone and ask it to `list files in my project directory` or `run a shell command to start the server`. Enjoy the power of Cursor right in your pocket! 🎉
