@@ -110,7 +110,7 @@ app.post('/token', express.urlencoded({ extended: true }), async (req, res) => {
         res.setHeader('Pragma', 'no-cache');
         res.status(200).send(JSON.stringify({
             access_token: config.apiKey,
-            token_type: "Bearer",
+            token_type: "bearer", // Lowercase recommended for some strict parsers
             expires_in: 3600, // 1 hour
             refresh_token: config.apiKey + "_refresh", // Must be distinct from access_token for strict validators
             scope: "mcp"
