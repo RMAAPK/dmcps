@@ -35,24 +35,44 @@ const mcpCorsMiddleware = (req: express.Request, res: express.Response, next: ex
 app.use(['/sse', '/message', '/mcp', '/mcp/message', '/authorize', '/token'], mcpCorsMiddleware);
 
 // --- Dummy OAuth2 Flow for Strict AI Agents (Gemini/ChatGPT) ---
+app.get('/.well-known/oauth-authorization-server', (req, res) => {
+    const issuer = `https://${req.get('host')}`;
+    res.json({
+        issuer: issuer,
+        authorization_endpoint: `${issuer}/authorize`,
+        token_endpoint: `${issuer}/token`,
+        response_types_supported: ["code"],
+        grant_types_supported: ["authorization_code"],
+        token_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic", "none"],
+        scopes_supported: ["mcp"]
+    });
+});
+
 app.get('/authorize', async (req, res) => {
     // For agents that mandate an OAuth authorization flow, immediately redirect them back with a dummy code.
     const redirectUri = req.query.redirect_uri as string;
     const state = req.query.state as string;
     if (redirectUri) {
-        res.redirect(`${redirectUri}?code=auth_code_dmcps&state=${state}`);
+        const url = new URL(redirectUri);
+        url.searchParams.set('code', 'auth_code_dmcps');
+        if (state) url.searchParams.set('state', state);
+        res.redirect(url.toString());
     } else {
         res.status(400).send("Missing redirect_uri");
     }
 });
 
-app.post('/token', async (req, res) => {
+// OAuth providers send token requests as application/x-www-form-urlencoded
+app.post('/token', express.urlencoded({ extended: true }), async (req, res) => {
     // Exchange the dummy code for the actual MCP API Key as a Bearer token
     const config = await loadConfig();
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
     res.json({
         access_token: config.apiKey,
         token_type: "Bearer",
-        expires_in: 31536000 // 1 year
+        expires_in: 31536000, // 1 year
+        scope: "mcp"
     });
 });
 // ---------------------------------------------------------------
@@ -432,6 +452,14 @@ if (!process.env.VERCEL) {
             } catch (err) {
                 console.error("❌ Failed to start ngrok tunnel:", err);
             }
+        }
+        
+        if (process.env.CLOUDFLARE_TOKEN) {
+            console.log("☁️ Starting Cloudflare Tunnel...");
+            const cf = exec(`cloudflared tunnel --no-autoupdate run --token ${process.env.CLOUDFLARE_TOKEN}`);
+            cf.stdout?.on('data', data => console.log(`[Cloudflared] ${data.toString().trim()}`));
+            cf.stderr?.on('data', data => console.log(`[Cloudflared] ${data.toString().trim()}`));
+            cf.on('close', code => console.log(`[Cloudflared] Exited with code ${code}`));
         }
     });
 }

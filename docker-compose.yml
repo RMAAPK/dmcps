@@ -22,6 +22,7 @@ services:
       # These serve as fallbacks if not defined in .env
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-supersecret}
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
+      - CLOUDFLARE_TOKEN=${CLOUDFLARE_TOKEN:-}
       - MCP_API_KEY=${MCP_API_KEY:-}
     
     # ------------------ SECURITY CONSTRAINTS ------------------ #
