@@ -12,7 +12,7 @@ RUN npm ci
 
 # Install cloudflared for Cloudflare Tunnel support and sudo for package management
 USER root
-RUN apk add --no-cache curl sudo iptables && \
+RUN apk add --no-cache curl sudo iptables git bash python3 make g++ jq vim unzip tar && \
     curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared && \
     chmod +x /usr/local/bin/cloudflared && \
     echo "node ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/node && \
