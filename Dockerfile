@@ -27,8 +27,7 @@ RUN npm run build
 # Create the isolated workspace directory and assign ownership to the non-root user
 RUN mkdir -p /workspace && chown -R node:node /workspace && chown -R node:node /app
 
-# Switch to the non-root user for security
-USER node
+# Kept as root to allow package installation on PaaS platforms like Render
 
 # Start the MCP server using stdio
 CMD ["npm", "start"]

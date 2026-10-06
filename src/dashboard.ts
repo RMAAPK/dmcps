@@ -522,7 +522,7 @@ function setupServer(server: Server) {
                     const cwd = String(request.params.arguments?.cwd);
                     await checkAccess(cwd);
                     const command = String(request.params.arguments?.command);
-                    
+                    let finalCommand = command;
                     if (command.trim().startsWith('sudo ')) {
                         const config = await loadConfig();
                         const isSudoAllowed = config.allowedSudoCommands.some(cmd => 
@@ -531,9 +531,11 @@ function setupServer(server: Server) {
                         if (!isSudoAllowed) {
                             throw new Error(`SECURITY EXCEPTION: Sudo command not allowed by whitelist.`);
                         }
+                        // Strip sudo since we are running as root and Render blocks setuid binaries
+                        finalCommand = command.trim().substring(5);
                     }
 
-                    const { stdout, stderr } = await execAsync(command, { cwd });
+                    const { stdout, stderr } = await execAsync(finalCommand, { cwd });
                     return { content: [{ type: "text", text: `STDOUT:\n${stdout}\nSTDERR:\n${stderr}` }] };
                 }
                 default:
