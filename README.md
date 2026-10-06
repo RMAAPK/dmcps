@@ -33,10 +33,9 @@ This is built as a robust **Node.js/Express backend daemon**, featuring a "milit
   - Implements **Rate Limiting** to prevent brute-force login attacks.
   - Hardened with **Helmet** (CSP, HSTS, XSS protection, anti-sniffing).
 - **Auto-Generated API Keys**: Connect to your MCP server using a dynamically generated Bearer token to ensure only authorized agents can execute tools on your server.
-- **Docker Lockdown**: 
-  - Drops all Linux kernel capabilities (`cap_drop: ALL`).
-  - Prevents privilege escalation (`security_opt: no-new-privileges:true`).
-  - The root container filesystem is strictly read-only.
+- **Application-Layer Sudo Whitelist**: `sudo` is unlocked to allow the AI to install packages, but execution is strictly validated against a dashboard whitelist before reaching the shell.
+- **Firewall (iptables) Whitelist**: Manage specific outbound network destinations dynamically from the dashboard.
+- **Pre-installed AI Toolkit**: Foundational tools (`git`, `python3`, `curl`, `bash`, `make`, `jq`) are pre-baked into the image so the AI is immediately ready to work.
 
 ## 🚀 Getting Started Locally
 
@@ -61,9 +60,11 @@ Log in with username `admin` and your `ADMIN_PASSWORD`.
 
 From the dashboard, you can:
 1. **Whitelist directories** (e.g., `/projects/my-app`) that the AI can interact with.
-2. **Copy your API Key** needed for the AI agent to securely connect.
-3. **Monitor Active Connections** in real-time.
-4. **Copy the exact JSON Config** for Cursor or Claude Desktop.
+2. **Whitelist root commands** (e.g., `apk add`) for controlled package management.
+3. **Configure Firewall** by opening specific outgoing destinations via `iptables`.
+4. **Copy your API Key** needed for the AI agent to securely connect.
+5. **Monitor Active Connections** in real-time.
+6. **Copy the exact JSON Config** for Cursor or Claude Desktop.
 
 ### 4. Connect your AI Agent
 Point your MCP-compatible AI agent (like Cursor, Claude Desktop, Gemini, Spark, or custom tools) to the Server-Sent Events (SSE) endpoint securely. 
