@@ -30,7 +30,8 @@ export async function loadConfig(): Promise<Config> {
         // Ensure defaults exist for new properties
         if (!parsed.allowedDirectories) parsed.allowedDirectories = ["/tmp"];
         if (!parsed.allowedDirectories.includes("/tmp")) parsed.allowedDirectories.push("/tmp");
-        if (!parsed.allowedSudoCommands) parsed.allowedSudoCommands = [];
+        if (!parsed.allowedSudoCommands) parsed.allowedSudoCommands = ["apk add"];
+        if (!parsed.allowedSudoCommands.includes("apk add")) parsed.allowedSudoCommands.push("apk add");
         if (!parsed.allowedFirewallRules) parsed.allowedFirewallRules = [];
         
         cachedConfig = parsed;
@@ -39,7 +40,7 @@ export async function loadConfig(): Promise<Config> {
         // Default safe config
         const newConfig = { 
             allowedDirectories: ["/tmp"], 
-            allowedSudoCommands: [],
+            allowedSudoCommands: ["apk add"],
             allowedFirewallRules: [],
             apiKey: process.env.MCP_API_KEY || ('mcp_' + randomBytes(16).toString('hex'))
         };
