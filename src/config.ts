@@ -9,6 +9,8 @@ import { randomBytes } from 'crypto';
 
 export interface Config {
     allowedDirectories: string[];
+    allowedSudoCommands: string[];
+    allowedFirewallRules: string[];
     apiKey: string;
 }
 
@@ -24,12 +26,21 @@ export async function loadConfig(): Promise<Config> {
             parsed.apiKey = process.env.MCP_API_KEY || ('mcp_' + randomBytes(16).toString('hex'));
             await saveConfig(parsed);
         }
+        
+        // Ensure defaults exist for new properties
+        if (!parsed.allowedDirectories) parsed.allowedDirectories = ["/tmp"];
+        if (!parsed.allowedDirectories.includes("/tmp")) parsed.allowedDirectories.push("/tmp");
+        if (!parsed.allowedSudoCommands) parsed.allowedSudoCommands = [];
+        if (!parsed.allowedFirewallRules) parsed.allowedFirewallRules = [];
+        
         cachedConfig = parsed;
         return parsed;
     } catch {
         // Default safe config
         const newConfig = { 
-            allowedDirectories: [], 
+            allowedDirectories: ["/tmp"], 
+            allowedSudoCommands: [],
+            allowedFirewallRules: [],
             apiKey: process.env.MCP_API_KEY || ('mcp_' + randomBytes(16).toString('hex'))
         };
         await saveConfig(newConfig).catch(() => {});

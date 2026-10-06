@@ -26,12 +26,14 @@ services:
       - MCP_API_KEY=${MCP_API_KEY:-}
     
     # ------------------ SECURITY CONSTRAINTS ------------------ #
-    # Drop all kernel capabilities for maximum security
+    # Drop all kernel capabilities for maximum security except what is needed for firewall
     cap_drop:
       - ALL
-    # Prevent privilege escalation
-    security_opt:
-      - no-new-privileges:true
+    cap_add:
+      - NET_ADMIN
+    # Prevent privilege escalation (Disabled to allow sudo)
+    # security_opt:
+    #   - no-new-privileges:true
     # Make the root filesystem read-only to prevent tampering
     read_only: true
     # Provide temporary writable filesystems for Node.js if needed
