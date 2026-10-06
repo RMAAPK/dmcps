@@ -2,6 +2,10 @@
 
 [![CI Tests](https://github.com/RMAAPK/dmcps/actions/workflows/test.yml/badge.svg)](https://github.com/RMAAPK/dmcps/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.thealidev/dmcps-success)](https://registry.modelcontextprotocol.io/)
+
+**🔥 OFFICIALLY PUBLISHED ON THE GLOBAL MCP REGISTRY!** 
+A true revolution in AI security. DMCPS seamlessly bypasses PaaS hypervisor limitations (like Render's `no-new-privileges`) via application-layer interceptors while retaining a military-grade directory sandbox.
 
 <p align="center">
   <a href="https://render.com/deploy?repo=https://github.com/RMAAPK/dmcps">
@@ -26,7 +30,7 @@ A highly secure, isolated Model Context Protocol (MCP) server environment design
 This is built as a robust **Node.js/Express backend daemon**, featuring a "military-grade" secured dashboard to strictly manage which directories the AI is allowed to touch.
 
 ## 🛡️ Key Security Features
-- **Zero Root Access**: Runs as a non-root user (`node`) inside an Alpine Docker container.
+- **PaaS Hypervisor Bypass via Node**: Runs natively as root within the container, but uses JS interceptors to filter commands, allowing package installs (`apk add`) seamlessly on Render without triggering `no-new-privileges` crashes.
 - **Strict Whitelisting**: The AI cannot read, write, or execute commands outside of directories explicitly whitelisted via the web dashboard. (Directory traversal attempts like `../` are mathematically blocked).
 - **Hardened Dashboard**:
   - Protected by a single environment password (`ADMIN_PASSWORD`).
