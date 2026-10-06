@@ -33,7 +33,7 @@ This is built as a robust **Node.js/Express backend daemon**, featuring a "milit
   - Implements **Rate Limiting** to prevent brute-force login attacks.
   - Hardened with **Helmet** (CSP, HSTS, XSS protection, anti-sniffing).
 - **Auto-Generated API Keys**: Connect to your MCP server using a dynamically generated Bearer token to ensure only authorized agents can execute tools on your server.
-- **Application-Layer Sudo Whitelist**: `sudo` is unlocked to allow the AI to install packages, but execution is strictly validated against a dashboard whitelist before reaching the shell.
+- **Application-Layer Sudo Whitelist**: `sudo` is unlocked to allow the AI to install packages, but execution is strictly validated against a dashboard whitelist before reaching the shell. (`apk add` is whitelisted by default).
 - **Firewall (iptables) Whitelist**: Manage specific outbound network destinations dynamically from the dashboard.
 - **Pre-installed AI Toolkit**: Foundational tools (`git`, `python3`, `curl`, `bash`, `make`, `jq`) are pre-baked into the image so the AI is immediately ready to work.
 
@@ -60,7 +60,7 @@ Log in with username `admin` and your `ADMIN_PASSWORD`.
 
 From the dashboard, you can:
 1. **Whitelist directories** (e.g., `/projects/my-app`) that the AI can interact with.
-2. **Whitelist root commands** (e.g., `apk add`) for controlled package management.
+2. **Whitelist root commands** for controlled package management (Note: `apk add` is already allowed by default).
 3. **Configure Firewall** by opening specific outgoing destinations via `iptables`.
 4. **Copy your API Key** needed for the AI agent to securely connect.
 5. **Monitor Active Connections** in real-time.
