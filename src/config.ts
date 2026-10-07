@@ -13,8 +13,7 @@ export interface DirectoryConfig {
 
 export interface Config {
     directorySettings: DirectoryConfig[];
-    allowedSudoCommands: string[];
-    allowedFirewallRules: string[];
+
     apiKey: string;
 }
 
@@ -44,16 +43,12 @@ export async function loadConfig(): Promise<Config> {
 
         if (!parsed.directorySettings) parsed.directorySettings = [{ path: "/tmp", allowWrite: true, enableBackups: false }];
         
-        if (!parsed.allowedSudoCommands) parsed.allowedSudoCommands = ["apk add"];
-        if (!parsed.allowedFirewallRules) parsed.allowedFirewallRules = [];
         
         cachedConfig = parsed;
         return parsed;
     } catch {
         const newConfig: Config = { 
             directorySettings: [{ path: "/tmp", allowWrite: true, enableBackups: false }], 
-            allowedSudoCommands: ["apk add"],
-            allowedFirewallRules: [],
             apiKey: process.env.MCP_API_KEY || ('mcp_' + randomBytes(16).toString('hex'))
         };
         // Do NOT save newly generated config automatically

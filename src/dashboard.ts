@@ -364,45 +364,8 @@ app.get('/', (req, res, next) => {
                     <button type="submit">Allow Directory</button>
                 </form>
 
-                <h3>🛡️ Sudo Command Whitelist</h3>
-                <p>Allow the AI to run specific commands as root using sudo (e.g., <code>apk add</code>).</p>
-                ${(!config.allowedSudoCommands || config.allowedSudoCommands.length === 0) ? '<p><i>No sudo commands allowed.</i></p>' : ''}
-                <ul>
-                    ${(config.allowedSudoCommands || []).map((cmd, idx) => `
-                        <li>
-                            <code>sudo ${cmd}</code>
-                            <form action="/remove-sudo" method="POST" style="margin:0;">
-                                <input type="hidden" name="index" value="${idx}">
-                                <button type="submit" class="danger">Revoke Command</button>
-                            </form>
-                        </li>
-                    `).join('')}
-                </ul>
 
-                <form action="/add-sudo" method="POST" class="form-group">
-                    <input type="text" name="command" placeholder="apk add" required>
-                    <button type="submit">Allow Sudo Command</button>
-                </form>
 
-                <h3>🔥 Firewall Whitelist (iptables)</h3>
-                <p>Manage allowed outgoing destinations. Rules are automatically applied via iptables.</p>
-                ${(!config.allowedFirewallRules || config.allowedFirewallRules.length === 0) ? '<p><i>No custom firewall rules active.</i></p>' : ''}
-                <ul>
-                    ${(config.allowedFirewallRules || []).map((rule, idx) => `
-                        <li>
-                            <code>${rule}</code>
-                            <form action="/remove-firewall" method="POST" style="margin:0;">
-                                <input type="hidden" name="index" value="${idx}">
-                                <button type="submit" class="danger">Remove Rule</button>
-                            </form>
-                        </li>
-                    `).join('')}
-                </ul>
-
-                <form action="/add-firewall" method="POST" class="form-group">
-                    <input type="text" name="rule" placeholder="github.com (or IP address)" required>
-                    <button type="submit">Allow Destination</button>
-                </form>
             </div>
         </body>
         </html>
@@ -439,63 +402,8 @@ app.post('/remove', authMiddleware, async (req, res) => {
     res.redirect('/');
 });
 
-app.post('/add-sudo', authMiddleware, async (req, res) => {
-    const cmd = req.body.command?.trim();
-    if (cmd) {
-        const config = await loadConfig();
-        if (!config.allowedSudoCommands) config.allowedSudoCommands = [];
-        if (!config.allowedSudoCommands.includes(cmd)) {
-            config.allowedSudoCommands.push(cmd);
-            await saveConfig(config);
-        }
-    }
-    res.redirect('/');
-});
 
-app.post('/remove-sudo', authMiddleware, async (req, res) => {
-    const index = parseInt(req.body.index, 10);
-    const config = await loadConfig();
-    if (config.allowedSudoCommands && !isNaN(index) && index >= 0 && index < config.allowedSudoCommands.length) {
-        config.allowedSudoCommands.splice(index, 1);
-        await saveConfig(config);
-    }
-    res.redirect('/');
-});
 
-app.post('/add-firewall', authMiddleware, async (req, res) => {
-    const rule = req.body.rule?.trim();
-    if (rule) {
-        const config = await loadConfig();
-        if (!config.allowedFirewallRules) config.allowedFirewallRules = [];
-        if (!config.allowedFirewallRules.includes(rule)) {
-            config.allowedFirewallRules.push(rule);
-            await saveConfig(config);
-            try {
-                // Best-effort firewall rule insertion for outgoing traffic
-                await execAsync(`sudo iptables -A OUTPUT -d ${rule} -j ACCEPT`);
-            } catch (e) {
-                console.error("Failed to apply firewall rule:", e);
-            }
-        }
-    }
-    res.redirect('/');
-});
-
-app.post('/remove-firewall', authMiddleware, async (req, res) => {
-    const index = parseInt(req.body.index, 10);
-    const config = await loadConfig();
-    if (config.allowedFirewallRules && !isNaN(index) && index >= 0 && index < config.allowedFirewallRules.length) {
-        const rule = config.allowedFirewallRules[index];
-        config.allowedFirewallRules.splice(index, 1);
-        await saveConfig(config);
-        try {
-            await execAsync(`sudo iptables -D OUTPUT -d ${rule} -j ACCEPT`);
-        } catch (e) {
-            console.error("Failed to remove firewall rule:", e);
-        }
-    }
-    res.redirect('/');
-});
 
 
 // ---------------- MCP SERVER LOGIC ----------------
