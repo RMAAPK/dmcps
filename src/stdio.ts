@@ -74,7 +74,13 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
             case "run_shell_command": {
                 const cwd = String(request.params.arguments?.cwd);
                 await checkAccess(cwd, false);
-                const command = String(request.params.arguments?.command);
+                let command = String(request.params.arguments?.command);
+                
+                // Strip sudo since the container is already root (PaaS platforms block setuid sudo)
+                if (command.trim().startsWith('sudo ')) {
+                    command = command.trim().replace(/^sudo\s+/, '');
+                }
+                
                 const { stdout, stderr } = await execAsync(command, { cwd });
                 return { content: [{ type: "text", text: `STDOUT:\n${stdout}\nSTDERR:\n${stderr}` }] };
             }

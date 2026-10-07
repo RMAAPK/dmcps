@@ -37,9 +37,15 @@ Our legacy architecture on AWS/Render hit fundamental bottlenecks:
 ### The V2 Rewrite Architecture
 DMCPS V2 throws out dynamic building and shifts to a **pure disposable isolation** model:
 - **Instant Orchestration:** We spin up a pre-built monolithic `dmcps-base` image via `docker run` in milliseconds.
-- **Root Without Risk:** The AI gets a full, unrestricted OS (no sudo blocks, no firewalls, full `rm -rf` power) completely *inside* the disposable Docker sandbox.
-- **Dashboard Whitelisting & Auto-Backups:** The dashboard now supports explicit directory mounting toggles (**Write Access** & **Backup Enabled**). If an AI modifies/deletes a whitelisted host directory, the host intercepts it and generates a `.bkp` instantly on the root to ensure zero data loss.
-- **Hugging Face Keys Sync:** Preserved strictly as a temporary pipeline for API keys/tokens (bypassing heavy disk overhead).
+- **Root Without Risk:** The AI gets a full, unrestricted OS (no sudo blocks, no firewalls, full `rm -rf` power) completely *inside* the disposable Docker sandbox. The AI is assigned a direct `root` user, tricking it into feeling absolute freedom without any "Permission denied" frustrations, because the container is entirely disposable.
+- **Dashboard Whitelisting & Auto-Backups:** The dashboard now supports explicit directory mounting toggles (**Write Access** & **Backup Enabled**). 
+- **HF Bucket Automated Backups:** Backups are seamlessly managed through a dedicated HuggingFace bucket (`hf.co/buckets/rmaapk/backupx`), completely offloading backup I/O and storage from the primary server.
+
+### DMCPS vs. OpenClaw (and other Agent Sandboxes)
+While frameworks like **OpenClaw** or SWE-agent provide excellent generic runtime sandboxes for LLM development, **DMCPS** is explicitly engineered for *safe local production orchestration*:
+1. **Absolute Root Illusion:** OpenClaw often locks down the environment or requires complex privilege escalation. DMCPS grants the agent native `root` inside a disposable container, immediately satisfying the agent's permission checks and avoiding broken script loops.
+2. **Dashboard-driven Access:** Instead of blindly mounting everything, DMCPS uses a strict whitelist dashboard where you grant explicit paths (with backup enforcement).
+3. **PaaS Native:** DMCPS is built from the ground up to deploy flawlessly on highly restricted PaaS environments (like Render and Railway) that block `setuid`/Docker-in-Docker, making it trivial to run a secure agent on a $5 cloud instance.
 
 ---
 A highly secure, isolated Model Context Protocol (MCP) server environment designed to give AI agents access to a sandboxed filesystem and shell execution, without compromising the host machine. 
