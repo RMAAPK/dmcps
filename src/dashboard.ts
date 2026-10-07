@@ -8,7 +8,8 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
-import { loadConfig, saveConfig, isPathAllowed } from './config.js';
+import { loadConfig, saveConfig, getDirectorySettings } from './config.js';
+import * as path from 'path';
 import ngrok from '@ngrok/ngrok';
 
 const execAsync = promisify(exec);
@@ -341,12 +342,16 @@ app.get('/', (req, res, next) => {
                 </ul>
 
                 <h3>📂 Currently Allowed Directories</h3>
-                ${config.allowedDirectories.length === 0 ? '<p><i>No directories allowed yet. The AI is completely locked out.</i></p>' : ''}
+                ${(!config.directorySettings || config.directorySettings.length === 0) ? '<p><i>No directories allowed yet. The AI is completely locked out.</i></p>' : ''}
                 <ul>
-                    ${config.allowedDirectories.map((dir, idx) => `
+                    ${(config.directorySettings || []).map((dir, idx) => `
                         <li>
-                            ${dir}
-                            <form action="/remove" method="POST" style="margin:0;">
+                            <strong>${dir.path}</strong> <br>
+                            <small>
+                              Write Access: <b style="color:${dir.allowWrite ? 'green' : 'red'}">${dir.allowWrite ? 'YES' : 'NO'}</b> | 
+                              Auto Backup (.bkp): <b style="color:${dir.enableBackups ? 'green' : 'red'}">${dir.enableBackups ? 'YES' : 'NO'}</b>
+                            </small>
+                            <form action="/remove" method="POST" style="margin-top: 5px;">
                                 <input type="hidden" name="index" value="${idx}">
                                 <button type="submit" class="danger">Revoke Access</button>
                             </form>
@@ -407,10 +412,17 @@ app.get('/', (req, res, next) => {
 
 app.post('/add', authMiddleware, async (req, res) => {
     const dir = req.body.directory?.trim();
+    const allowWrite = req.body.allowWrite === 'on';
+    const enableBackups = req.body.enableBackups === 'on';
     if (dir) {
         const config = await loadConfig();
-        if (!config.allowedDirectories.includes(dir)) {
-            config.allowedDirectories.push(dir);
+        const existing = config.directorySettings.find(d => d.path === dir);
+        if (!existing) {
+            config.directorySettings.push({ path: dir, allowWrite, enableBackups });
+            await saveConfig(config);
+        } else {
+            existing.allowWrite = allowWrite;
+            existing.enableBackups = enableBackups;
             await saveConfig(config);
         }
     }
@@ -420,8 +432,8 @@ app.post('/add', authMiddleware, async (req, res) => {
 app.post('/remove', authMiddleware, async (req, res) => {
     const index = parseInt(req.body.index, 10);
     const config = await loadConfig();
-    if (!isNaN(index) && index >= 0 && index < config.allowedDirectories.length) {
-        config.allowedDirectories.splice(index, 1);
+    if (!isNaN(index) && index >= 0 && index < config.directorySettings.length) {
+        config.directorySettings.splice(index, 1);
         await saveConfig(config);
     }
     res.redirect('/');
@@ -490,9 +502,31 @@ app.post('/remove-firewall', authMiddleware, async (req, res) => {
 
 const mcpServer = new Server({ name: "secure-sandbox-mcp", version: "1.0.0" }, { capabilities: { tools: {} } });
 
-async function checkAccess(targetPath: string) {
-    if (!(await isPathAllowed(targetPath))) {
+async function checkAccess(targetPath: string, requireWrite: boolean = false) {
+    const dirConfig = await getDirectorySettings(targetPath);
+    if (!dirConfig) {
         throw new Error(`SECURITY EXCEPTION: Access to path '${targetPath}' is explicitly denied by dashboard configuration.`);
+    }
+    if (requireWrite && !dirConfig.allowWrite) {
+        throw new Error(`SECURITY EXCEPTION: Write access to path '${targetPath}' is explicitly denied by dashboard configuration.`);
+    }
+    return dirConfig;
+}
+
+async function createBackup(filePath: string) {
+    try {
+        const stat = await fs.stat(filePath).catch(() => null);
+        if (!stat || !stat.isFile()) return;
+        let counter = 0;
+        let bkpPath = `${filePath}.bkp`;
+        while (await fs.stat(bkpPath).catch(() => null)) {
+            counter++;
+            bkpPath = `${filePath}.bkp${counter}`;
+        }
+        await fs.copyFile(filePath, bkpPath);
+        console.log(`[Backup] Created backup: ${bkpPath}`);
+    } catch (e) {
+        console.error(`[Backup] Failed to create backup for ${filePath}:`, e);
     }
 }
 
