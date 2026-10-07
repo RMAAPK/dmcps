@@ -15,6 +15,8 @@ services:
       # Mount the main host directory into the container (e.g. /projects).
       # The AI is blocked from accessing subdirectories until whitelisted via the dashboard.
       - ./projects:/projects
+      # Mount the backups directory so file backups persist on the host
+      - ./backups:/workspace/backups
     # Read environment variables from the .env file
     env_file:
       - .env

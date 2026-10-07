@@ -29,7 +29,7 @@ export async function loadConfig(): Promise<Config> {
         
         if (!parsed.apiKey || process.env.MCP_API_KEY) {
             parsed.apiKey = process.env.MCP_API_KEY || ('mcp_' + randomBytes(16).toString('hex'));
-            await saveConfig(parsed);
+            // Do NOT save the token back to disk per user request!
         }
         
         // Migrate old allowedDirectories string[] to new format
@@ -56,7 +56,7 @@ export async function loadConfig(): Promise<Config> {
             allowedFirewallRules: [],
             apiKey: process.env.MCP_API_KEY || ('mcp_' + randomBytes(16).toString('hex'))
         };
-        await saveConfig(newConfig).catch(() => {});
+        // Do NOT save newly generated config automatically
         cachedConfig = newConfig;
         return newConfig;
     }
