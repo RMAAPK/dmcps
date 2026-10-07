@@ -25,6 +25,23 @@ A true revolution in AI security. DMCPS seamlessly bypasses PaaS hypervisor limi
   <a href="https://www.producthunt.com/products/dmcps/reviews/new?utm_source=badge-product_review&utm_medium=badge&utm_source=badge-dmcps" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/product_review.svg?product_id=1333432&theme=neutral" alt="DMCPS - Secure Docker sandbox for AI agent filesystem & shell access | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 </p>
 
+
+
+## 🚀 DMCPS V2: Absolute Sandbox Isolation (Rewrite In Progress)
+
+### The "Massive Rocks" We Hit (Why V2?)
+Our legacy architecture on AWS/Render hit fundamental bottlenecks:
+1. **Startup Lag:** Dynamic container builds (`npm ci`, disk chowning) on every request choked disk I/O and CPU, leading to massive lag on micro-instances.
+2. **Lost Base Control:** The latency caused agents to randomly lose structural connection to the base orchestrator.
+
+### The V2 Rewrite Architecture
+DMCPS V2 throws out dynamic building and shifts to a **pure disposable isolation** model:
+- **Instant Orchestration:** We spin up a pre-built monolithic `dmcps-base` image via `docker run` in milliseconds.
+- **Root Without Risk:** The AI gets a full, unrestricted OS (no sudo blocks, no firewalls, full `rm -rf` power) completely *inside* the disposable Docker sandbox.
+- **Dashboard Whitelisting & Auto-Backups:** The dashboard now supports explicit directory mounting toggles (**Write Access** & **Backup Enabled**). If an AI modifies/deletes a whitelisted host directory, the host intercepts it and generates a `.bkp` instantly on the root to ensure zero data loss.
+- **Hugging Face Keys Sync:** Preserved strictly as a temporary pipeline for API keys/tokens (bypassing heavy disk overhead).
+
+---
 A highly secure, isolated Model Context Protocol (MCP) server environment designed to give AI agents access to a sandboxed filesystem and shell execution, without compromising the host machine. 
 
 This is built as a robust **Node.js/Express backend daemon**, featuring a "military-grade" secured dashboard to strictly manage which directories the AI is allowed to touch.
