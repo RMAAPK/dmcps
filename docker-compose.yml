@@ -22,8 +22,8 @@ services:
       - .env
     environment:
       # These serve as fallbacks if not defined in .env
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-supersecret}
-      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
       - CLOUDFLARE_TOKEN=${CLOUDFLARE_TOKEN:-}
       - MCP_API_KEY=${MCP_API_KEY:-}
       - HF_BUCKET_URL=${HF_BUCKET_URL:-}

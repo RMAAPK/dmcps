@@ -10,7 +10,6 @@ import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import { loadConfig, saveConfig, getDirectorySettings } from './config.js';
 import * as path from 'path';
-import ngrok from '@ngrok/ngrok';
 
 const execAsync = promisify(exec);
 const app = express();
@@ -156,12 +155,13 @@ app.use((req, res, next) => {
 });
 
 // Basic Authentication Middleware for Dashboard ONLY
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
     const [user, password] = Buffer.from(b64auth, 'base64').toString().split(':');
     
-    if (user === 'admin' && password === ADMIN_PASSWORD) {
+    if (user === ADMIN_USERNAME && password === ADMIN_PASSWORD) {
         return next();
     }
     res.set('WWW-Authenticate', 'Basic realm="Sandbox Dashboard"');
@@ -824,18 +824,6 @@ if (!process.env.VERCEL) {
 
     app.listen(PORT, '0.0.0.0', async () => {
         console.log(`🚀 Secure Dashboard & MCP Server listening on port ${PORT}`);
-        
-        if (process.env.NGROK_AUTHTOKEN) {
-            try {
-                const listener = await ngrok.forward({
-                    addr: PORT,
-                    authtoken: process.env.NGROK_AUTHTOKEN,
-                });
-                console.log(`🌍 Public ngrok Dashboard: ${listener.url()}/`);
-            } catch (err) {
-                console.error("❌ Failed to start ngrok tunnel:", err);
-            }
-        }
         
         if (process.env.CLOUDFLARE_TOKEN) {
             console.log("☁️ Starting Cloudflare Tunnel...");
