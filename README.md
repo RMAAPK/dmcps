@@ -122,9 +122,10 @@ You can now turn your phone into a full-fledged cloud coding environment, giving
 1. Open the Gemini App (or gemini.google.com).
 2. Go to **Settings > Connected Apps**.
 3. Scroll to the bottom and click **Add a custom app** under "Custom apps for Spark".
-4. When prompted for the **MCP Server URL**, enter your server's endpoint:
-   👉 `https://YOUR-APP-URL.onrender.com/gemini`
-5. (If prompted for a Client ID or Secret, just leave them blank or enter dummy text — our custom OAuth bypass handles it automatically).
-6. Click Connect!
+4. When prompted for the **MCP Server URL**, enter your server's root endpoint (e.g. `https://YOUR-APP-URL.onrender.com`).
+   > ⚠️ **IMPORTANT**: Do NOT use `trycloudflare.com` quick tunnels. Cloudflare's anti-bot "Checking your browser" interstitial page blocks Gemini Spark from verifying the connection. Use `localhost.run`, Ngrok, or a permanent domain.
+5. Gemini Spark will automatically verify the server by fetching OAuth discovery metadata (`/.well-known/oauth-protected-resource`).
+6. Follow the on-screen prompts. If asked to authorize, our custom dummy OAuth flow will handle the redirect automatically.
+7. Click Connect!
 
 Once connected, you can open a chat with Gemini on your phone and ask it to `list files in my project directory` or `run a shell command to start the server`. Enjoy the power of Cursor right in your pocket! 🎉

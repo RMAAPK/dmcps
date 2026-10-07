@@ -1,0 +1,36 @@
+{
+  "name": "io.github.RMAAPK/dmcps",
+  "version": "1.0.0",
+  "description": "DMCPS: A highly secure, isolated MCP server environment giving AI agents access to a sandboxed filesystem and shell execution.",
+  "author": "Raja Muhammad Ali Asghar",
+  "icon": "🛡️",
+  "repository": "https://github.com/RMAAPK/dmcps",
+  "license": "MIT",
+  "commands": {
+    "docker": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "${PWD}/projects:/projects",
+        "-p",
+        "3000:3000",
+        "node:20-alpine", 
+        "sh", "-c", "npx -y dmcps"
+      ]
+    },
+    "curl": {
+      "command": "curl",
+      "args": [
+        "-N",
+        "-s",
+        "-H",
+        "Authorization: Bearer mcp_6d5a4b013df68a5956be5238e3eb452d",
+        "https://dmcps.onrender.com/sse"
+      ]
+    }
+  }
+}
+

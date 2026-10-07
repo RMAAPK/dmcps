@@ -65,7 +65,7 @@ const mcpCorsMiddleware = (req: express.Request, res: express.Response, next: ex
     }
     next();
 };
-app.use(['/sse', '/message', '/mcp', '/mcp/message', '/authorize', '/token', '/gemini', '/gemini-body'], mcpCorsMiddleware);
+app.use(['/sse', '/message', '/mcp', '/mcp/message', '/authorize', '/token', '/gemini', '/gemini-body', '/.well-known', '/.well-known/oauth-authorization-server'], mcpCorsMiddleware);
 
 // --- Dummy OAuth2 Flow for Strict AI Agents (Gemini/ChatGPT) ---
 app.get('/.well-known/oauth-authorization-server', (req, res) => {
@@ -78,6 +78,18 @@ app.get('/.well-known/oauth-authorization-server', (req, res) => {
         grant_types_supported: ["authorization_code"],
         token_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic", "none"],
         scopes_supported: ["mcp"]
+    });
+});
+
+app.get('/.well-known/oauth-protected-resource', (req, res) => {
+    const issuer = `https://${req.get('host')}`;
+    res.json({
+        "resource": issuer,
+        "authorization_servers": [
+            issuer
+        ],
+        "scopes_supported": ["mcp"],
+        "bearer_methods_supported": ["header"]
     });
 });
 
