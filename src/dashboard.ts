@@ -736,8 +736,92 @@ const handleMessage = async (req: express.Request, res: express.Response) => {
 app.post('/message', handleMessage);
 app.post('/mcp/message', handleMessage);
 
+// ---------------- HF BUCKET SNAPSHOT BACKUPS ----------------
+async function restoreSnapshot() {
+    const hfUrl = process.env.HF_BUCKET_URL;
+    const hfKey = process.env.HF_API_KEY;
+    if (!hfUrl || !hfKey) return;
+    
+    console.log("📥 Attempting to restore container snapshot from HuggingFace Bucket...");
+    try {
+        const cleanUrl = hfUrl.endsWith('/') ? hfUrl.slice(0, -1) : hfUrl;
+        const targetUrl = `${cleanUrl}/sandbox_snapshot.tar.gz`;
+        
+        // Fetch snapshot
+        const res = await fetch(targetUrl, {
+            headers: { 'Authorization': `Bearer ${hfKey}` }
+        });
+        
+        if (res.ok) {
+            const buffer = await res.arrayBuffer();
+            await fs.writeFile('/tmp/sandbox_snapshot.tar.gz', Buffer.from(buffer));
+            
+            // Validate tarball
+            const fileType = await execAsync(`file /tmp/sandbox_snapshot.tar.gz`).catch(() => ({stdout: ''}));
+            if (fileType.stdout.includes("gzip compressed data")) {
+                await execAsync(`tar -xzf /tmp/sandbox_snapshot.tar.gz -C /`);
+                console.log("✅ Sandbox snapshot restored successfully from HF bucket.");
+            } else {
+                console.log("⚠️ No valid snapshot found on remote bucket.");
+            }
+        } else {
+            console.log("⚠️ No previous snapshot found on remote bucket (Starting fresh).");
+        }
+    } catch (e: any) {
+        console.error("❌ Failed to restore snapshot:", e.message);
+    }
+}
+
+async function takeSnapshot() {
+    const hfUrl = process.env.HF_BUCKET_URL;
+    const hfKey = process.env.HF_API_KEY;
+    if (!hfUrl || !hfKey) return;
+
+    try {
+        const config = await loadConfig();
+        
+        // Always ignore massive/dynamic directories to avoid crashing
+        const ignores = ['/proc', '/sys', '/dev', '/tmp', '/run', '/app/node_modules', '/workspace/backups'];
+        
+        // Ignore dashboard-mounted host directories so we don't duplicate host state
+        for (const d of config.directorySettings) {
+            if (d.path !== '/' && d.path !== '.') {
+                ignores.push(d.path);
+            }
+        }
+        
+        const excludeArgs = ignores.map(ign => `--exclude=${ign}`).join(' ');
+        
+        // Create a snapshot of the disposable container root (|| true prevents exit on warnings)
+        await execAsync(`tar -czf /tmp/sandbox_snapshot.tar.gz ${excludeArgs} / || true`);
+        
+        const snapshotData = await fs.readFile('/tmp/sandbox_snapshot.tar.gz');
+        
+        // Upload
+        const cleanUrl = hfUrl.endsWith('/') ? hfUrl.slice(0, -1) : hfUrl;
+        const targetUrl = `${cleanUrl}/sandbox_snapshot.tar.gz`;
+        
+        await fetch(targetUrl, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${hfKey}`,
+                'Content-Type': 'application/octet-stream'
+            },
+            body: snapshotData
+        });
+    } catch (e: any) {
+        // Silent failure for interval to not spam logs
+    }
+}
+
 // ---------------- VERCEL / SERVERLESS EXPORT ----------------
 if (!process.env.VERCEL) {
+    // Attempt restore on boot
+    restoreSnapshot().then(() => {
+        // Start 5-second interval snapshotter
+        setInterval(takeSnapshot, 5000);
+    });
+
     app.listen(PORT, '0.0.0.0', async () => {
         console.log(`🚀 Secure Dashboard & MCP Server listening on port ${PORT}`);
         
