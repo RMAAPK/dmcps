@@ -26,6 +26,8 @@ services:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
       - CLOUDFLARE_TOKEN=${CLOUDFLARE_TOKEN:-}
       - MCP_API_KEY=${MCP_API_KEY:-}
+      - HF_BUCKET_URL=${HF_BUCKET_URL:-}
+      - HF_API_KEY=${HF_API_KEY:-}
     
     # ------------------ SECURITY CONSTRAINTS ------------------ #
     # (Disabled to allow AI to install packages and use sudo)

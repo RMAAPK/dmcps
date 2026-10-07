@@ -53,10 +53,31 @@ mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
                 if (settings.enableBackups) {
                     try {
                         const existingContent = await fs.readFile(filePath, 'utf-8');
+                        const backupFilename = `${Date.now()}_${path.basename(filePath)}.bak`;
+                        
+                        // 1. Local Host-Mounted Backup
                         const backupDir = path.join('/workspace/backups', path.basename(filePath));
                         await fs.mkdir(backupDir, { recursive: true });
-                        const backupPath = path.join(backupDir, `${Date.now()}.bak`);
+                        const backupPath = path.join(backupDir, backupFilename);
                         await fs.writeFile(backupPath, existingContent, 'utf-8');
+
+                        // 2. Remote HuggingFace Bucket Backup
+                        const hfUrl = process.env.HF_BUCKET_URL;
+                        const hfKey = process.env.HF_API_KEY;
+                        if (hfUrl && hfKey) {
+                            const cleanUrl = hfUrl.endsWith('/') ? hfUrl.slice(0, -1) : hfUrl;
+                            const targetUrl = `${cleanUrl}/${backupFilename}`;
+                            
+                            // Native fetch (Node 18+) to push to the cloud bucket
+                            fetch(targetUrl, {
+                                method: 'PUT',
+                                headers: {
+                                    'Authorization': `Bearer ${hfKey}`,
+                                    'Content-Type': 'text/plain'
+                                },
+                                body: existingContent
+                            }).catch(e => console.error(`HF Backup failed for ${backupFilename}:`, e));
+                        }
                     } catch (err: any) {
                         // ignore if file doesn't exist
                         if (err.code !== 'ENOENT') {
