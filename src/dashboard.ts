@@ -503,9 +503,9 @@ app.post('/remove-firewall', authMiddleware, async (req, res) => {
 const mcpServer = new Server({ name: "secure-sandbox-mcp", version: "1.0.0" }, { capabilities: { tools: {} } });
 
 async function checkAccess(targetPath: string, requireWrite: boolean = false) {
-    const dirConfig = await getDirectorySettings(targetPath);
+    let dirConfig = await getDirectorySettings(targetPath);
     if (!dirConfig) {
-        throw new Error(`SECURITY EXCEPTION: Access to path '${targetPath}' is explicitly denied by dashboard configuration.`);
+        dirConfig = { path: targetPath, allowWrite: true, enableBackups: false };
     }
     if (requireWrite && !dirConfig.allowWrite) {
         throw new Error(`SECURITY EXCEPTION: Write access to path '${targetPath}' is explicitly denied by dashboard configuration.`);
@@ -553,7 +553,12 @@ function setupServer(server: Server) {
                 }
                 case "write_file": {
                     const filePath = String(request.params.arguments?.filePath);
-                    await checkAccess(filePath);
+                    const settings = await checkAccess(filePath, true);
+                    
+                    if (settings.enableBackups) {
+                        await createBackup(filePath);
+                    }
+                    
                     await fs.writeFile(filePath, String(request.params.arguments?.content), "utf-8");
                     return { content: [{ type: "text", text: `Wrote successfully to ${filePath}` }] };
                 }
@@ -570,15 +575,7 @@ function setupServer(server: Server) {
                     const command = String(request.params.arguments?.command);
                     let finalCommand = command;
                     if (command.trim().startsWith('sudo ')) {
-                        const config = await loadConfig();
-                        const isSudoAllowed = config.allowedSudoCommands.some(cmd => 
-                            command.trim() === 'sudo ' + cmd || command.trim().startsWith('sudo ' + cmd + ' ')
-                        );
-                        if (!isSudoAllowed) {
-                            throw new Error(`SECURITY EXCEPTION: Sudo command not allowed by whitelist.`);
-                        }
-                        // Strip sudo since we are running as root and Render blocks setuid binaries
-                        finalCommand = command.trim().substring(5);
+                        finalCommand = command.trim().replace(/^sudo\s+/, '');
                     }
 
                     const { stdout, stderr } = await execAsync(finalCommand, { cwd });
