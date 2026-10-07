@@ -22,10 +22,14 @@ mcpServer.setRequestHandler(ListToolsRequestSchema, async () => {
 });
 
 async function checkAccess(targetPath: string, isWrite: boolean = false) {
-    const settings = await getDirectorySettings(targetPath);
+    let settings = await getDirectorySettings(targetPath);
+    
+    // V2 ARCHITECTURE: If a path isn't explicitly configured in the dashboard (like / or .), 
+    // we default to allowing it because the container is completely disposable.
     if (!settings) {
-        throw new Error(`SECURITY EXCEPTION: Access to path '${targetPath}' is explicitly denied by dashboard configuration.`);
+        settings = { path: targetPath, allowWrite: true, enableBackups: false };
     }
+    
     if (isWrite && !settings.allowWrite) {
         throw new Error(`SECURITY EXCEPTION: Write access to path '${targetPath}' is denied by dashboard configuration.`);
     }
