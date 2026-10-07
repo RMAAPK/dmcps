@@ -43,3 +43,20 @@ services:
     # Provide temporary writable filesystems for Node.js if needed
     tmpfs:
       - /tmp
+  caddy:
+    image: caddy:latest
+    container_name: caddy-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - mcp-server
+
+volumes:
+  caddy_data:
+  caddy_config:
