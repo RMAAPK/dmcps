@@ -39,7 +39,7 @@ DMCPS V2 throws out dynamic building and shifts to a **pure disposable isolation
 - **Instant Orchestration:** We spin up a pre-built monolithic `dmcps-base` image via `docker run` in milliseconds.
 - **Root Without Risk:** The AI gets a full, unrestricted OS (no sudo blocks, no firewalls, full `rm -rf` power) completely *inside* the disposable Docker sandbox. The AI is assigned a direct `root` user, tricking it into feeling absolute freedom without any "Permission denied" frustrations, because the container is entirely disposable.
 - **Dashboard Whitelisting & Auto-Backups:** The dashboard now supports explicit directory mounting toggles (**Write Access** & **Backup Enabled**). 
-- **HF Bucket Automated Backups:** Backups are seamlessly managed through a dedicated HuggingFace bucket (`hf.co/buckets/rmaapk/backupx`), completely offloading backup I/O and storage from the primary server.
+- **HF Bucket Automated Backups:** Backups can be seamlessly managed and synced through a dedicated HuggingFace bucket, completely offloading backup I/O and storage from the primary server.
 
 ### DMCPS vs. OpenClaw (and other Agent Sandboxes)
 While frameworks like **OpenClaw** or SWE-agent provide excellent generic runtime sandboxes for LLM development, **DMCPS** is explicitly engineered for *safe local production orchestration*:
