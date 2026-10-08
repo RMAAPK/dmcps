@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "DMCPS (Docker Model Context Protocol Secured) - A highly secure MCP sandbox for AI agents",
   "author": "Raja Muhammad Ali Asghar (@thealidev)",
-  "license": "MIT",
+  "license": "BUSL-1.1",
   "type": "module",
   "main": "dist/dashboard.js",
   "scripts": {
