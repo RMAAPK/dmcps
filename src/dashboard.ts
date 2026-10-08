@@ -10,6 +10,12 @@ import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { CallToolRequestSchema, ListToolsRequestSchema, JSONRPCMessage } from "@modelcontextprotocol/sdk/types.js";
 import { loadConfig, saveConfig, getDirectorySettings } from './config.js';
 import * as path from 'path';
+import crypto from 'crypto';
+
+const PH_CLIENT_ID = 'xKnXB_auuhgrlbFPBjcsIIyngMHPiEyO45FzzdgT2WI';
+let phCodeVerifier = '';
+let phAccessToken = '';
+
 
 const execAsync = promisify(exec);
 const app = express();
@@ -46,6 +52,15 @@ app.get('/debug-logs', (req, res) => {
     });
 });
 // ------------------------------------
+
+
+app.get('/ph-login', (req, res) => {
+    phCodeVerifier = crypto.randomBytes(32).toString('base64url');
+    const codeChallenge = crypto.createHash('sha256').update(phCodeVerifier).digest('base64url');
+    const redirectUri = process.env.PH_REDIRECT_URI || 'https://localhost:5000';
+    const url = `https://api.producthunt.com/v2/oauth/authorize?client_id=${PH_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+    res.redirect(url);
+});
 
 // ---------------- MIDDLEWARE & SECURITY ----------------
 // Use helmet but allow cross-origin resource sharing for web-based AI agents (like Spark)
@@ -445,6 +460,8 @@ function setupServer(server: Server) {
                 { name: "read_file", description: "Read a file", inputSchema: { type: "object", properties: { filePath: { type: "string" } }, required: ["filePath"] } },
                 { name: "write_file", description: "Write content to a file", inputSchema: { type: "object", properties: { filePath: { type: "string" }, content: { type: "string" } }, required: ["filePath", "content"] } },
                 { name: "list_directory", description: "List files and directories", inputSchema: { type: "object", properties: { dirPath: { type: "string" } }, required: ["dirPath"] } },
+
+                { name: "ph_graphql_query", description: "Execute a GraphQL query against the Product Hunt V2 API. Requires the user to have linked their Product Hunt account.", inputSchema: { type: "object", properties: { query: { type: "string" }, variables: { type: "object" } }, required: ["query"] } },
                 { name: "run_shell_command", description: "Run a shell command", inputSchema: { type: "object", properties: { command: { type: "string" }, cwd: { type: "string", description: "Directory to run command in" } }, required: ["command", "cwd"] } },
             ],
         };
@@ -453,6 +470,24 @@ function setupServer(server: Server) {
     server.setRequestHandler(CallToolRequestSchema, async (request) => {
         try {
             switch (request.params.name) {
+
+                case "ph_graphql_query": {
+                    if (!phAccessToken) {
+                        return { content: [{ type: "text", text: "Error: Product Hunt not linked. Please visit the DMCPS dashboard and click 'Link Product Hunt'." }] };
+                    }
+                    const fetch = globalThis.fetch;
+                    const phRes = await fetch("https://api.producthunt.com/v2/api/graphql", {
+                        method: "POST",
+                        headers: { "Authorization": `Bearer ${phAccessToken}`, "Content-Type": "application/json", "Accept": "application/json" },
+                        body: JSON.stringify({
+                            query: request.params.arguments?.query,
+                            variables: request.params.arguments?.variables || {}
+                        })
+                    });
+                    const phData = await phRes.json();
+                    return { content: [{ type: "text", text: JSON.stringify(phData, null, 2) }] };
+                }
+
                 case "read_file": {
                     const filePath = String(request.params.arguments?.filePath);
                     await checkAccess(filePath);
