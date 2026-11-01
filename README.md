@@ -1,5 +1,8 @@
 # 🛡️ DMCPS (Docker Model Context Protocol Secured)
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.23859054.svg)](https://doi.org/10.5281/zenodo.23859054)
+
+
 [![CI Tests](https://github.com/RMAAPK/dmcps/actions/workflows/test.yml/badge.svg)](https://github.com/RMAAPK/dmcps/actions/workflows/test.yml)
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](https://mariadb.com/bsl11/)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-io.github.thealidev/dmcps-success)](https://registry.modelcontextprotocol.io/)
